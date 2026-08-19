@@ -1,0 +1,10 @@
+{
+  "name": "EcoCycle – Online Waste Segregation & Recycling System",
+  "description": "A comprehensive waste and environmental management platform featuring smart waste classification, AI bot assistant powered by Gemini, photo upload for waste and pollution reporting (air, water, and soil pollution), electricity bill payment with eco-point discounts, pickup scheduling, and collection center locator.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
