@@ -1,16 +1,12 @@
 import React, { useState } from 'react';
 import { 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Clock, 
   Send, 
   ChevronDown, 
   HelpCircle, 
   CheckCircle2, 
-  MessageSquare,
-  Sparkles
+  MessageSquare
 } from 'lucide-react';
+import { ContactLocationDetailsCard } from '../components/ContactLocationDetailsCard';
 
 export const ContactView: React.FC = () => {
   const [name, setName] = useState('');
@@ -75,54 +71,15 @@ export const ContactView: React.FC = () => {
         </div>
 
         {/* Contact Info + Form Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* Info Column */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="glass-panel rounded-3xl p-8 shadow-2xl space-y-6">
-              <h2 className="text-2xl font-black text-[#063B32]">Contact Information</h2>
-              <p className="text-xs text-[#365A52] font-semibold leading-relaxed">
-                Our environmental helpline is active 6 days a week to support municipal residents and housing societies.
-              </p>
-
-              <div className="space-y-4 pt-2">
-                <div className="flex items-start gap-3 text-xs">
-                  <MapPin className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="block text-[#063B32] font-black">EcoCycle Central Operations:</strong>
-                    <span className="text-[#365A52] font-semibold">12th Cross, Green Tech Hub, SS Puram, Tumkur, Karnataka 572102</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 text-xs">
-                  <Phone className="w-5 h-5 text-emerald-600 shrink-0" />
-                  <div>
-                    <strong className="block text-[#063B32] font-black">Toll-Free Helpline:</strong>
-                    <span className="text-[#365A52] font-semibold">1800-123-ECOCYCLE (+91 80 2345 6789)</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 text-xs">
-                  <Mail className="w-5 h-5 text-emerald-600 shrink-0" />
-                  <div>
-                    <strong className="block text-[#063B32] font-black">Official Email:</strong>
-                    <span className="text-[#365A52] font-semibold">support@ecocycle.org</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 text-xs">
-                  <Clock className="w-5 h-5 text-emerald-600 shrink-0" />
-                  <div>
-                    <strong className="block text-[#063B32] font-black">Working Hours:</strong>
-                    <span className="text-[#365A52] font-semibold">Monday – Saturday: 08:00 AM – 06:00 PM</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+          {/* Info Column with Interactive Video Background */}
+          <div className="lg:col-span-6 space-y-6">
+            <ContactLocationDetailsCard className="h-full" />
           </div>
 
           {/* Form Column */}
-          <div className="lg:col-span-7">
+          <div className="lg:col-span-6">
             <div className="glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl">
               
               <h2 className="text-xl font-black text-[#063B32] mb-6 flex items-center gap-2">

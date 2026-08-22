@@ -75,6 +75,17 @@ export const HeroSection: React.FC = () => {
               </button>
             ))}
           </div>
+
+          <div className="pt-3 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate('about')}
+              className="px-4 py-2 rounded-2xl bg-white/20 hover:bg-white/30 text-white border border-white/40 text-xs font-black backdrop-blur-md shadow-md transition-all flex items-center gap-2"
+            >
+              <span>🎥 Watch 4-Stage EcoCycle Video (Segregate • Collect • Recycle • Reuse)</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </form>
 
       </div>

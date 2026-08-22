@@ -2,10 +2,11 @@ import React from 'react';
 import { 
   Target, 
   Globe2, 
-  Award,
-  Sparkles,
-  Leaf
+  Award, 
+  Leaf,
+  Sparkles
 } from 'lucide-react';
+import { EcoCycleVideoShowcase } from '../components/EcoCycleVideoShowcase';
 
 export const AboutView: React.FC = () => {
   return (
@@ -25,6 +26,26 @@ export const AboutView: React.FC = () => {
           <p className="text-base font-semibold text-emerald-50/90 mt-3 drop-shadow-xs">
             EcoCycle connects citizens, municipal authorities, and authorized recyclers into a single, unified circular economy platform.
           </p>
+        </div>
+
+        {/* Video Operational Workflow Showcase */}
+        <div className="space-y-4">
+          <div className="text-center max-w-2xl mx-auto">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100/90 text-emerald-800 text-[11px] font-black uppercase tracking-wider mb-2 border border-emerald-300">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Operational Lifecycle In Motion</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black text-white drop-shadow-md">
+              The EcoCycle 4-Stage Operational System
+            </h2>
+            <p className="text-xs sm:text-sm font-semibold text-emerald-50/90 mt-1 drop-shadow-xs">
+              Watch how our smart municipal platform manages waste from doorstep segregation to clean industrial reuse.
+            </p>
+          </div>
+
+          <div className="max-w-5xl mx-auto">
+            <EcoCycleVideoShowcase />
+          </div>
         </div>
 
         {/* Vision & Mission Grid */}

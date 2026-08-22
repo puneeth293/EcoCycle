@@ -10,8 +10,12 @@ import {
   Filter, 
   ArrowRight,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  Video,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
+import { EcoCycleVideoShowcase } from '../components/EcoCycleVideoShowcase';
 
 export const SegregationView: React.FC = () => {
   const { selectedSearchItem, setSelectedSearchItem, addSegregationRecord, setActiveWasteItemModal } = useApp();
@@ -19,6 +23,7 @@ export const SegregationView: React.FC = () => {
   const [queryItem, setQueryItem] = useState(selectedSearchItem || '');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [loadingAi, setLoadingAi] = useState(false);
+  const [showVideoGuide, setShowVideoGuide] = useState(false);
   
   // Active classification output
   const [classificationResult, setClassificationResult] = useState<any | null>(null);
@@ -128,7 +133,7 @@ export const SegregationView: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-10">
+        <div className="text-center max-w-3xl mx-auto mb-8">
           <span className="px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-white/85 text-emerald-800 border border-white/80 shadow-xs backdrop-blur-md">
             Smart Waste Segregation Assistant
           </span>
@@ -138,7 +143,26 @@ export const SegregationView: React.FC = () => {
           <p className="text-sm font-semibold text-emerald-50/90 mt-1.5 drop-shadow-xs">
             Enter any household item to get real-time categorization, color-coded bin recommendations, preparation steps, and eco-points!
           </p>
+
+          {/* Quick Action to Open Video Showcase */}
+          <div className="mt-4 flex justify-center">
+            <button
+              onClick={() => setShowVideoGuide(!showVideoGuide)}
+              className="px-4 py-2 rounded-2xl bg-white/90 hover:bg-white text-[#063B32] font-black text-xs flex items-center gap-2 shadow-lg border border-white/80 backdrop-blur-md transition-all hover:scale-105"
+            >
+              <Video className="w-4 h-4 text-emerald-600" />
+              <span>{showVideoGuide ? 'Hide 4-Stage Lifecycle Video' : 'Watch 4-Stage EcoCycle Video (Segregate • Collect • Recycle • Reuse)'}</span>
+              {showVideoGuide ? <ChevronUp className="w-3.5 h-3.5 text-emerald-600" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-600" />}
+            </button>
+          </div>
         </div>
+
+        {/* Collapsible Video Showcase */}
+        {showVideoGuide && (
+          <div className="max-w-5xl mx-auto mb-12 animate-in fade-in slide-in-from-top-4 duration-300">
+            <EcoCycleVideoShowcase />
+          </div>
+        )}
 
         {/* Assistant Input Form Card: White Glass Panel */}
         <div className="glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl max-w-3xl mx-auto mb-12">

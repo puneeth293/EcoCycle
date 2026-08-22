@@ -1,5 +1,5 @@
 import React from 'react';
-import bgImage from '../assets/images/eco_website_bg_1787062661277.jpg';
+import bgImage from '../assets/images/ecocycle_hero_bg_1787409279777.jpg';
 
 export const GlobalBackground: React.FC = () => {
   return (
@@ -14,12 +14,12 @@ export const GlobalBackground: React.FC = () => {
         style={{
           backgroundImage: `url(${bgImage})`,
           backgroundAttachment: 'fixed',
-          backgroundPosition: 'center 30%',
+          backgroundPosition: 'center 35%',
         }}
       />
 
       {/* Atmospheric Mist & Readability Gradient Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/45 via-slate-900/20 to-slate-950/65 backdrop-blur-[0.5px]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/40 via-slate-900/15 to-slate-950/60 backdrop-blur-[0.3px]" />
 
       {/* Soft Emerald & Teal Ambient Radial Lights */}
       <div className="absolute -top-32 left-1/4 w-[600px] h-[600px] bg-emerald-500/15 rounded-full blur-3xl animate-pulse-glow" />
