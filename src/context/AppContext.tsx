@@ -12,10 +12,11 @@ interface AppContextType {
   currentPage: PageRoute;
   navigate: (page: PageRoute) => void;
   user: UserProfile | null;
-  loginUser: (email: string, passwordOrRole?: string) => void;
-  registerUser: (name: string, email: string, passwordOrPhone?: string, phone?: string) => void;
-  login: (email: string, passwordOrRole?: string) => void;
-  register: (name: string, email: string, passwordOrPhone?: string, phone?: string) => void;
+  loginUser: (email: string, passwordOrRole?: string) => boolean;
+  registerUser: (name: string, email: string, password?: string, phone?: string) => boolean;
+  updateUserName: (name: string) => void;
+  login: (email: string, passwordOrRole?: string) => boolean;
+  register: (name: string, email: string, password?: string, phone?: string) => boolean;
   logoutUser: () => void;
   pickupRequests: PickupRequest[];
   addPickupRequest: (requestData: Omit<PickupRequest, 'id' | 'status' | 'createdAt'>) => Promise<PickupRequest>;
@@ -33,25 +34,11 @@ interface AppContextType {
   setActiveWasteItemModal: (id: string | null) => void;
 }
 
-const DEFAULT_USER: UserProfile = {
-  id: 'u-101',
-  name: 'Puneeth',
-  email: 'puneeth@ecocycle.org',
-  phone: '+91 98765 43210',
-  role: 'user',
-  ecoPoints: 420,
-  itemsRecycled: 24,
-  wasteSegregatedKg: 18,
-  pickupRequestsCount: 5,
-  joinedDate: '2026-01-15',
-  badges: ['🌱 Eco Starter', '♻️ Recycling Hero']
-};
-
 const DEFAULT_PICKUPS: PickupRequest[] = [
   {
-    id: 'EC-2026-00125',
-    userName: 'Puneeth',
-    userEmail: 'puneeth@ecocycle.org',
+    id: 'RN-2026-00125',
+    userName: 'Anand Kumar',
+    userEmail: 'anand.k@example.com',
     userPhone: '+91 98765 43210',
     address: '102 Green Enclave, M.G. Road',
     city: 'Tumkur',
@@ -100,17 +87,37 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentPage, setCurrentPage] = useState<PageRoute>('home');
   const [user, setUser] = useState<UserProfile | null>(() => {
-    const saved = localStorage.getItem('ecocycle_user');
-    return saved ? JSON.parse(saved) : DEFAULT_USER;
+    try {
+      const saved = localStorage.getItem('recynova_user') || localStorage.getItem('ecocycle_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Clear old hardcoded developer mock identity so visitor is not forced into developer profile
+        if (
+          parsed &&
+          (parsed.id === 'u-101' ||
+           parsed.name === 'Puneeth' ||
+           parsed.email === 'puneeth@recynova.org' ||
+           parsed.email === 'puneeth@ecocycle.org')
+        ) {
+          localStorage.removeItem('recynova_user');
+          localStorage.removeItem('ecocycle_user');
+          return null;
+        }
+        return parsed;
+      }
+    } catch {
+      return null;
+    }
+    return null;
   });
 
   const [pickupRequests, setPickupRequests] = useState<PickupRequest[]>(() => {
-    const saved = localStorage.getItem('ecocycle_pickups');
+    const saved = localStorage.getItem('recynova_pickups') || localStorage.getItem('ecocycle_pickups');
     return saved ? JSON.parse(saved) : DEFAULT_PICKUPS;
   });
 
   const [segregationHistory, setSegregationHistory] = useState<SegregationRecord[]>(() => {
-    const saved = localStorage.getItem('ecocycle_history');
+    const saved = localStorage.getItem('recynova_history') || localStorage.getItem('ecocycle_history');
     return saved ? JSON.parse(saved) : [
       { id: 'sh1', itemName: 'Plastic Bottle', category: 'Recyclable Waste', date: '2026-08-07', pointsEarned: 15 },
       { id: 'sh2', itemName: 'Banana Peel', category: 'Wet Waste', date: '2026-08-06', pointsEarned: 10 },
@@ -129,17 +136,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     if (user) {
+      localStorage.setItem('recynova_user', JSON.stringify(user));
       localStorage.setItem('ecocycle_user', JSON.stringify(user));
+
+      // Synchronize changes to registered accounts storage
+      try {
+        const raw = localStorage.getItem('recynova_registered_accounts');
+        if (raw) {
+          const list: any[] = JSON.parse(raw);
+          const idx = list.findIndex((a) => a.email?.toLowerCase() === user.email?.toLowerCase());
+          if (idx >= 0) {
+            list[idx] = { ...list[idx], ...user };
+            localStorage.setItem('recynova_registered_accounts', JSON.stringify(list));
+            localStorage.setItem('recynova_registered_users', JSON.stringify(list));
+          }
+        }
+      } catch {}
     } else {
+      localStorage.removeItem('recynova_user');
       localStorage.removeItem('ecocycle_user');
     }
   }, [user]);
 
   useEffect(() => {
+    localStorage.setItem('recynova_pickups', JSON.stringify(pickupRequests));
     localStorage.setItem('ecocycle_pickups', JSON.stringify(pickupRequests));
   }, [pickupRequests]);
 
   useEffect(() => {
+    localStorage.setItem('recynova_history', JSON.stringify(segregationHistory));
     localStorage.setItem('ecocycle_history', JSON.stringify(segregationHistory));
   }, [segregationHistory]);
 
@@ -159,12 +184,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const loginUser = (email: string, passwordOrRole: string = 'user') => {
-    if (passwordOrRole === 'admin' || email.toLowerCase().includes('admin') || passwordOrRole === 'admin123') {
+  const loginUser = (email: string, passwordOrRole: string = 'user'): boolean => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      showToast('Please enter your email address.', 'error');
+      return false;
+    }
+
+    if (passwordOrRole === 'admin' || cleanEmail.includes('admin@') || passwordOrRole === 'admin123') {
       const adminProfile: UserProfile = {
         id: 'admin-001',
         name: 'System Admin',
-        email: email || 'admin@ecocycle.org',
+        email: cleanEmail || 'admin@recynova.org',
         phone: '+91 80000 11111',
         role: 'admin',
         ecoPoints: 1000,
@@ -177,44 +208,180 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setUser(adminProfile);
       showToast('Logged in as Administrator 🛡️', 'success');
       navigate('admin');
-    } else {
+      return true;
+    }
+
+    let accounts: any[] = [];
+    try {
+      const raw = localStorage.getItem('recynova_registered_accounts') || localStorage.getItem('recynova_registered_users');
+      if (raw) {
+        accounts = JSON.parse(raw);
+      }
+    } catch {}
+
+    const found = accounts.find((u: any) => u.email?.toLowerCase() === cleanEmail);
+    if (found) {
+      // If password was stored and user entered a password that doesn't match
+      if (found.password && passwordOrRole && passwordOrRole !== 'user' && found.password !== passwordOrRole) {
+        showToast('Incorrect password. Please try again.', 'error');
+        return false;
+      }
+
       const userProfile: UserProfile = {
-        id: 'u-' + Date.now(),
-        name: email.split('@')[0] || 'Eco Guardian',
-        email: email,
+        id: found.id || 'u-' + Date.now(),
+        name: found.name || 'Eco Member',
+        email: found.email,
+        phone: found.phone || '+91 98765 43210',
+        role: found.role || 'user',
+        ecoPoints: found.ecoPoints ?? 50,
+        itemsRecycled: found.itemsRecycled ?? 0,
+        wasteSegregatedKg: found.wasteSegregatedKg ?? 0,
+        pickupRequestsCount: found.pickupRequestsCount ?? 0,
+        joinedDate: found.joinedDate || new Date().toISOString().split('T')[0],
+        badges: found.badges || ['🌱 Eco Starter']
+      };
+      setUser(userProfile);
+      showToast(`Welcome back, ${userProfile.name}! 🌱`, 'success');
+      navigate('dashboard');
+      return true;
+    }
+
+    if (cleanEmail === 'resident@recynova.org') {
+      const userProfile: UserProfile = {
+        id: 'u-demo-resident',
+        name: 'Green Resident',
+        email: 'resident@recynova.org',
         phone: '+91 98765 43210',
         role: 'user',
         ecoPoints: 250,
         itemsRecycled: 12,
         wasteSegregatedKg: 10,
         pickupRequestsCount: 2,
-        joinedDate: new Date().toISOString().split('T')[0],
-        badges: ['🌱 Eco Starter']
+        joinedDate: '2026-01-15',
+        badges: ['🌱 Eco Starter', '♻️ Recycling Hero']
       };
       setUser(userProfile);
       showToast(`Welcome back, ${userProfile.name}! 🌱`, 'success');
       navigate('dashboard');
+      return true;
     }
-  };
 
-  const registerUser = (name: string, email: string, passwordOrPhone?: string, phone?: string) => {
-    const userPhone = phone || passwordOrPhone || '+91 98765 43210';
-    const newUser: UserProfile = {
+    // If new user logging in directly
+    const userPrefix = cleanEmail.split('@')[0] || 'Member';
+    const cleanName = userPrefix.charAt(0).toUpperCase() + userPrefix.slice(1);
+    const userProfile: UserProfile = {
       id: 'u-' + Date.now(),
-      name: name,
-      email: email,
-      phone: userPhone,
+      name: cleanName,
+      email: cleanEmail,
+      phone: '+91 98765 43210',
       role: 'user',
-      ecoPoints: 50, // Welcome bonus
+      ecoPoints: 50,
       itemsRecycled: 0,
       wasteSegregatedKg: 0,
       pickupRequestsCount: 0,
       joinedDate: new Date().toISOString().split('T')[0],
       badges: ['🌱 Eco Starter']
     };
-    setUser(newUser);
-    showToast('Account created! You earned 50 Welcome Eco Points 🌱', 'success');
+
+    accounts.push({ ...userProfile, password: passwordOrRole });
+    try {
+      localStorage.setItem('recynova_registered_accounts', JSON.stringify(accounts));
+      localStorage.setItem('recynova_registered_users', JSON.stringify(accounts));
+    } catch {}
+
+    setUser(userProfile);
+    showToast(`Welcome to Recynova, ${userProfile.name}! 🌱`, 'success');
     navigate('dashboard');
+    return true;
+  };
+
+  const registerUser = (name: string, email: string, password?: string, phone?: string): boolean => {
+    const cleanName = name.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPhone = phone?.trim() || '+91 98765 43210';
+
+    if (!cleanName) {
+      showToast('Please enter your full name.', 'error');
+      return false;
+    }
+
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      showToast('Please enter a valid email address.', 'error');
+      return false;
+    }
+
+    if (password && password.length < 6) {
+      showToast('Password must be at least 6 characters long.', 'error');
+      return false;
+    }
+
+    let accounts: any[] = [];
+    try {
+      const raw = localStorage.getItem('recynova_registered_accounts') || localStorage.getItem('recynova_registered_users');
+      if (raw) {
+        accounts = JSON.parse(raw);
+      }
+    } catch {}
+
+    const existing = accounts.find((u: any) => u.email?.toLowerCase() === cleanEmail);
+    if (existing) {
+      showToast('An account with this email already exists. Please log in.', 'info');
+      return false;
+    }
+
+    const newUser: UserProfile = {
+      id: 'u-' + Date.now(),
+      name: cleanName,
+      email: cleanEmail,
+      phone: cleanPhone,
+      role: 'user',
+      ecoPoints: 50, // Welcome bonus points
+      itemsRecycled: 0,
+      wasteSegregatedKg: 0,
+      pickupRequestsCount: 0,
+      joinedDate: new Date().toISOString().split('T')[0],
+      badges: ['🌱 Eco Starter']
+    };
+
+    const newAccount = {
+      ...newUser,
+      password: password || 'password'
+    };
+
+    accounts.push(newAccount);
+    try {
+      localStorage.setItem('recynova_registered_accounts', JSON.stringify(accounts));
+      localStorage.setItem('recynova_registered_users', JSON.stringify(accounts));
+    } catch {}
+
+    setUser(newUser);
+    showToast(`Account created for ${newUser.name}! +50 Welcome Eco Points 🌱`, 'success');
+    navigate('dashboard');
+    return true;
+  };
+
+  const updateUserName = (newName: string) => {
+    if (!user) return;
+    const clean = newName.trim();
+    if (!clean) return;
+    const updated = { ...user, name: clean };
+    setUser(updated);
+
+    try {
+      const raw = localStorage.getItem('recynova_registered_users');
+      if (raw) {
+        const list = JSON.parse(raw);
+        const idx = list.findIndex((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
+        if (idx >= 0) {
+          list[idx].name = clean;
+        } else {
+          list.push({ name: clean, email: user.email });
+        }
+        localStorage.setItem('recynova_registered_users', JSON.stringify(list));
+      }
+    } catch {}
+
+    showToast(`Profile name updated to ${clean}!`, 'success');
   };
 
   const logoutUser = () => {
@@ -350,6 +517,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         user,
         loginUser,
         registerUser,
+        updateUserName,
         login: loginUser,
         register: registerUser,
         logoutUser,

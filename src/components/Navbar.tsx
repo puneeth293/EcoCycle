@@ -17,13 +17,17 @@ import {
   Sparkles,
   Camera,
   Zap,
-  Upload
+  Upload,
+  Edit2,
+  Check
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { currentPage, navigate, user, logoutUser } = useApp();
+  const { currentPage, navigate, user, logoutUser, updateUserName } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editingNameValue, setEditingNameValue] = useState('');
 
   const navLinks: { label: string; page: PageRoute; icon?: any }[] = [
     { label: 'Home', page: 'home' },
@@ -58,12 +62,9 @@ export const Navbar: React.FC = () => {
             </div>
             <div className="text-left">
               <div className="text-2xl font-black tracking-tight flex items-center gap-1 font-sans text-[#063B32]">
-                <span>Eco</span>
-                <span className="text-emerald-600">Cycle</span>
+                <span>Recy</span>
+                <span className="text-emerald-600">nova</span>
               </div>
-              <p className="text-[10px] text-[#365A52] font-bold tracking-wider uppercase -mt-1">
-                Waste & Recycling System
-              </p>
             </div>
           </button>
 
@@ -137,10 +138,57 @@ export const Navbar: React.FC = () => {
 
                 {/* Dropdown Menu */}
                 {userDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-60 bg-white/95 border border-white/80 rounded-2xl shadow-2xl p-2 z-50 text-[#063B32] divide-y divide-emerald-100/80 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150">
+                  <div className="absolute right-0 mt-2 w-64 bg-white/95 border border-white/80 rounded-2xl shadow-2xl p-2 z-50 text-[#063B32] divide-y divide-emerald-100/80 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150">
                     <div className="px-3 py-2.5">
-                      <p className="text-[11px] text-[#365A52] font-semibold">Signed in as</p>
-                      <p className="text-xs font-black text-[#063B32] truncate">{user.email}</p>
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="text-[10px] uppercase tracking-wider font-extrabold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
+                          Logged In User
+                        </span>
+                        {!isEditingName ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsEditingName(true);
+                              setEditingNameValue(user.name);
+                            }}
+                            className="text-[11px] text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 hover:underline"
+                            title="Edit your display name"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                            <span>Edit Name</span>
+                          </button>
+                        ) : null}
+                      </div>
+
+                      {isEditingName ? (
+                        <div className="flex items-center gap-1.5 mt-1.5 mb-1">
+                          <input
+                            type="text"
+                            value={editingNameValue}
+                            onChange={(e) => setEditingNameValue(e.target.value)}
+                            placeholder="Enter your name"
+                            className="flex-1 text-xs px-2 py-1 rounded-lg border border-emerald-300 font-bold text-[#063B32] focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (editingNameValue.trim()) {
+                                updateUserName(editingNameValue);
+                              }
+                              setIsEditingName(false);
+                            }}
+                            className="p-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white"
+                            title="Save name"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-sm font-black text-[#063B32] truncate">{user.name}</p>
+                      )}
+
+                      <p className="text-[11px] text-[#365A52] font-semibold truncate mt-0.5">{user.email}</p>
                     </div>
                     <div className="py-1">
                       <button

@@ -49,7 +49,7 @@ export const StatsSection: React.FC = () => {
             Real Environmental Impact
           </span>
           <h2 className="text-3xl sm:text-4xl font-black text-white drop-shadow-md mt-2.5">
-            EcoCycle Community Metrics
+            Recynova Community Metrics
           </h2>
           <p className="text-sm font-semibold text-emerald-50/90 mt-1 drop-shadow-xs">
             Driving tangible waste reduction and material recovery across municipal zones.

@@ -45,7 +45,7 @@ const MainContent: React.FC = () => {
           {currentPage === 'rewards' && <RewardsView />}
           {currentPage === 'about' && <AboutView />}
           {currentPage === 'contact' && <ContactView />}
-          {currentPage === 'login' && <AuthView />}
+          {(currentPage === 'login' || currentPage === 'register') && <AuthView />}
           {currentPage === 'admin' && <AdminView />}
         </main>
 

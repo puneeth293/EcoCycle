@@ -32,7 +32,7 @@ export const HomeView: React.FC = () => {
                   How You Can Make an Immediate Difference Today
                 </h2>
                 <p className="text-sm font-semibold text-[#365A52] mt-2">
-                  Joining the EcoCycle platform takes less than 2 minutes and rewards every sustainable action.
+                  Joining the Recynova platform takes less than 2 minutes and rewards every sustainable action.
                 </p>
 
                 <div className="space-y-4 mt-8">

@@ -63,7 +63,7 @@ export const ContactView: React.FC = () => {
           </div>
 
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mt-3 font-sans tracking-tight drop-shadow-md">
-            Contact EcoCycle Support
+            Contact Recynova Support
           </h1>
           <p className="text-base font-semibold text-emerald-50/90 mt-2 drop-shadow-xs">
             Have questions about collection schedules, corporate bulk waste handling, or partnership opportunities? Reach out to our team.
@@ -92,7 +92,7 @@ export const ContactView: React.FC = () => {
                   <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
                   <h3 className="text-lg font-black text-[#063B32]">Message Delivered!</h3>
                   <p className="text-xs text-[#365A52] font-semibold">
-                    Thank you for contacting EcoCycle. An environmental support representative will respond within 24 hours.
+                    Thank you for contacting Recynova. An environmental support representative will respond within 24 hours.
                   </p>
                   <button
                     onClick={() => setSentSuccess(false)}

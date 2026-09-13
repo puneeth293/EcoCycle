@@ -282,7 +282,7 @@ export const ElectricityBillView: React.FC = () => {
                     }}
                     className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#063B32] text-xs font-mono font-bold border border-emerald-200 transition-colors"
                   >
-                    ⚡ BESCOM-99281 (Puneeth)
+                    ⚡ BESCOM-99281 (Residential)
                   </button>
                   <button
                     type="button"

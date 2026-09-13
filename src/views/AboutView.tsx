@@ -17,14 +17,14 @@ export const AboutView: React.FC = () => {
         <div className="text-center max-w-3xl mx-auto">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/85 text-emerald-800 border border-white/80 text-xs font-black uppercase tracking-wider shadow-xs backdrop-blur-md">
             <Leaf className="w-4 h-4 text-emerald-600" />
-            <span>About EcoCycle Platform</span>
+            <span>About Recynova Platform</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-black text-white mt-3 leading-tight drop-shadow-md">
             Pioneering Digital Solutions for Municipal Waste Segregation
           </h1>
           <p className="text-base font-semibold text-emerald-50/90 mt-3 drop-shadow-xs">
-            EcoCycle connects citizens, municipal authorities, and authorized recyclers into a single, unified circular economy platform.
+            Recynova connects citizens, municipal authorities, and authorized recyclers into a single, unified circular economy platform.
           </p>
         </div>
 
@@ -36,7 +36,7 @@ export const AboutView: React.FC = () => {
               <span>Operational Lifecycle In Motion</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black text-white drop-shadow-md">
-              The EcoCycle 4-Stage Operational System
+              The Recynova 4-Stage Operational System
             </h2>
             <p className="text-xs sm:text-sm font-semibold text-emerald-50/90 mt-1 drop-shadow-xs">
               Watch how our smart municipal platform manages waste from doorstep segregation to clean industrial reuse.
@@ -78,7 +78,7 @@ export const AboutView: React.FC = () => {
           <div className="text-center max-w-2xl mx-auto mb-10">
             <h2 className="text-3xl font-black text-[#063B32]">The 3 R's Pillar Philosophy</h2>
             <p className="text-xs text-[#365A52] font-bold mt-1">
-              Every action on EcoCycle aligns with international sustainable material management standards.
+              Every action on Recynova aligns with international sustainable material management standards.
             </p>
           </div>
 

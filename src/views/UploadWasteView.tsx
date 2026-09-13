@@ -79,7 +79,7 @@ export const UploadWasteView: React.FC = () => {
   const [historyFilter, setHistoryFilter] = useState<'all' | ReportCategory>('all');
 
   const [reportHistory, setReportHistory] = useState<EnvironmentalReportRecord[]>(() => {
-    const saved = localStorage.getItem('ecocycle_environmental_reports');
+    const saved = localStorage.getItem('recynova_environmental_reports') || localStorage.getItem('ecocycle_environmental_reports');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -132,6 +132,7 @@ export const UploadWasteView: React.FC = () => {
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
+    localStorage.setItem('recynova_environmental_reports', JSON.stringify(reportHistory));
     localStorage.setItem('ecocycle_environmental_reports', JSON.stringify(reportHistory));
   }, [reportHistory]);
 
@@ -770,7 +771,7 @@ export const UploadWasteView: React.FC = () => {
                 <span>Your Environmental Verification & Report Log</span>
               </h2>
               <p className="text-xs text-[#365A52] font-semibold">
-                All photos inspected and rewarded by EcoCycle AI
+                All photos inspected and rewarded by Recynova AI
               </p>
             </div>
 

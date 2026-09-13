@@ -35,7 +35,7 @@ export const HeroSection: React.FC = () => {
         </h1>
 
         <p className="text-base sm:text-lg text-emerald-50/95 font-medium leading-relaxed max-w-2xl mx-auto drop-shadow-sm">
-          EcoCycle helps you identify waste categories instantly, locate verified municipal recycling centers, schedule doorstep pickups, and earn rewards for sustainability.
+          Recynova helps you identify waste categories instantly, locate verified municipal recycling centers, schedule doorstep pickups, and earn rewards for sustainability.
         </p>
 
         {/* Quick Waste Lookup Input */}
@@ -82,7 +82,7 @@ export const HeroSection: React.FC = () => {
               onClick={() => navigate('about')}
               className="px-4 py-2 rounded-2xl bg-white/20 hover:bg-white/30 text-white border border-white/40 text-xs font-black backdrop-blur-md shadow-md transition-all flex items-center gap-2"
             >
-              <span>🎥 Watch 4-Stage EcoCycle Video (Segregate • Collect • Recycle • Reuse)</span>
+              <span>🎥 Watch 4-Stage Recynova Video (Segregate • Collect • Recycle • Reuse)</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>

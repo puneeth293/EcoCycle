@@ -22,7 +22,7 @@ export const Footer: React.FC = () => {
                 <Recycle className="w-6 h-6 stroke-[2.5]" />
               </div>
               <span className="text-2xl font-black tracking-tight text-[#063B32]">
-                Eco<span className="text-emerald-600">Cycle</span>
+                Recy<span className="text-emerald-600">nova</span>
               </span>
             </div>
             <p className="text-sm text-[#365A52] font-semibold leading-relaxed italic">
@@ -52,6 +52,11 @@ export const Footer: React.FC = () => {
                 <button onClick={() => handleNav('ai-bot')} className="hover:text-emerald-700 text-emerald-700 font-bold transition-colors flex items-center gap-1.5">
                   <Bot className="w-4 h-4 text-emerald-600" />
                   <span>AI Assistant</span>
+                </button>
+              </li>
+              <li>
+                <button onClick={() => handleNav('about')} className="hover:text-emerald-700 font-bold text-emerald-800 transition-colors flex items-center gap-1.5">
+                  <span>🎥 4-Stage Recynova Video</span>
                 </button>
               </li>
               <li>
@@ -130,11 +135,11 @@ export const Footer: React.FC = () => {
             <div className="space-y-2.5 text-xs text-[#365A52] font-medium">
               <p className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>EcoCycle HQ, B.H. Road, Industrial Area, Tumkur - 572103</span>
+                <span>Recynova HQ, B.H. Road, Industrial Area, Tumkur - 572103</span>
               </p>
               <p className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>support@ecocycle.org</span>
+                <span>support@recynova.org</span>
               </p>
               <p className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -162,7 +167,7 @@ export const Footer: React.FC = () => {
 
         {/* Bottom copyright line */}
         <div className="pt-8 border-t border-emerald-100 flex flex-col md:flex-row items-center justify-between text-xs text-[#365A52] font-semibold gap-4">
-          <p>© 2026 EcoCycle. All Rights Reserved.</p>
+          <p>© 2026 Recynova. All Rights Reserved.</p>
           <div className="flex items-center gap-6">
             <span className="hover:text-emerald-700 cursor-pointer">Privacy Policy</span>
             <span className="hover:text-emerald-700 cursor-pointer">Terms of Service</span>

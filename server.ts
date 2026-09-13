@@ -12,6 +12,10 @@ const PORT = 3000;
 app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
+// Serve static videos
+app.use("/videos", express.static(path.join(process.cwd(), "public/videos")));
+app.use(express.static(path.join(process.cwd(), "public")));
+
 // Initialize Gemini client server-side if key is present
 let aiClient: GoogleGenAI | null = null;
 
@@ -99,7 +103,7 @@ app.post("/api/chat", async (req, res) => {
     const ai = getAiClient();
 
     if (ai) {
-      const systemInstruction = `You are EcoBot, the intelligent AI Environmental Assistant & Sustainability Copilot for the EcoCycle platform.
+      const systemInstruction = `You are EcoBot, the intelligent AI Environmental Assistant & Sustainability Copilot for the Recynova platform.
 Your expertise covers:
 1. Solid Waste Segregation & Bin Color Coding:
    - Green Bin 🟢: Wet waste, organic food scraps, vegetable peels, garden waste, tea leaves, compostable matter.
@@ -113,7 +117,7 @@ Your expertise covers:
 3. Electricity Bill Payments & Eco Points Rebates:
    - Users can search any state electricity provider (BESCOM, Tata Power, MSEDCL, TANGEDCO, BSES, etc.) using their Consumer ID.
    - Users can redeem their accumulated Eco Points for direct cash discounts on electricity bills (1 Eco Point = ₹0.50 off).
-   - Paying bills through EcoCycle awards +50 bonus Eco Points and official BBPS receipts.
+   - Paying bills through Recynova awards +50 bonus Eco Points and official BBPS receipts.
 4. Doorstep Waste Pickups & Collection Centers:
    - Booking doorstep collection for heavy scrap, recyclables, or e-waste.
    - Finding verified neighborhood collection depots.
@@ -225,7 +229,7 @@ function generateEcoBotFallback(query: string) {
 
   if (q.includes("photo") || q.includes("upload") || q.includes("reward") || q.includes("points") || q.includes("earn") || q.includes("pollution") || q.includes("air") || q.includes("smoke")) {
     return {
-      reply: `### 📸 Upload Waste & Environmental Vision Rewards\n\nEcoCycle AI analyzes your uploaded photos in real-time:\n\n1. **Solid Waste Photos**: Upload your sorted dry recyclables or compost items to earn **+35 to +50 Eco Points**.\n2. **Pollution Reporting**: Photograph factory chimney smoke, vehicular smog, lake chemical froth, or illegal dumpsites.\n3. **Automated Protection**: AI calculates pollutant metrics (PM2.5, toxicity index), provides safety advice, files a CPCB grievance ticket, and awards **+60 to +75 Eco Points**!`,
+      reply: `### 📸 Upload Waste & Environmental Vision Rewards\n\nRecynova AI analyzes your uploaded photos in real-time:\n\n1. **Solid Waste Photos**: Upload your sorted dry recyclables or compost items to earn **+35 to +50 Eco Points**.\n2. **Pollution Reporting**: Photograph factory chimney smoke, vehicular smog, lake chemical froth, or illegal dumpsites.\n3. **Automated Protection**: AI calculates pollutant metrics (PM2.5, toxicity index), provides safety advice, files a CPCB grievance ticket, and awards **+60 to +75 Eco Points**!`,
       suggestedActions: [
         { label: "📸 Open Upload Waste & Pollution", actionType: "navigate", target: "upload-waste" },
         { label: "⚡ Check Electricity Bill Savings", actionType: "navigate", target: "electricity-bill" }
@@ -244,7 +248,7 @@ function generateEcoBotFallback(query: string) {
   }
 
   return {
-    reply: `### 👋 Hi there! I'm EcoBot, your AI Environmental Assistant.\n\nI can help you with anything related to sustainable living and the EcoCycle platform:\n\n* 🗑️ **Waste Segregation**: Ask me which bin any household item belongs in (Green, Blue, Yellow, Red).\n* 📸 **Upload Waste & Pollution**: Learn how to photograph waste or neighborhood smog to earn **+35 to +75 Eco Points**.\n* ⚡ **Electricity Bills**: Redeem your accumulated points for **₹0.50/pt discounts** on BESCOM, Tata Power, and state electricity bills.\n* 🚚 **Doorstep Pickups**: Schedule hassle-free doorstep collection for bulky recyclables and e-waste.\n\nHow can I help you today?`,
+    reply: `### 👋 Hi there! I'm EcoBot, your AI Environmental Assistant.\n\nI can help you with anything related to sustainable living and the Recynova platform:\n\n* 🗑️ **Waste Segregation**: Ask me which bin any household item belongs in (Green, Blue, Yellow, Red).\n* 📸 **Upload Waste & Pollution**: Learn how to photograph waste or neighborhood smog to earn **+35 to +75 Eco Points**.\n* ⚡ **Electricity Bills**: Redeem your accumulated points for **₹0.50/pt discounts** on BESCOM, Tata Power, and state electricity bills.\n* 🚚 **Doorstep Pickups**: Schedule hassle-free doorstep collection for bulky recyclables and e-waste.\n\nHow can I help you today?`,
     suggestedActions: [
       { label: "🗑️ How do I segregate e-waste?", actionType: "query", target: "How do I safely segregate and dispose of e-waste and lithium batteries?" },
       { label: "⚡ How do I discount my power bill?", actionType: "query", target: "How do I redeem Eco Points to reduce my electricity bill amount?" },
@@ -529,7 +533,7 @@ function generateFallbackMultiDomainAnalysis(queryHint: string, reportCategory: 
       actionSteps: [
         "Store in a moisture-free container at room temperature.",
         "Tape over exposed battery terminals to prevent short-circuits.",
-        "Schedule a specialized EcoCycle doorstep pickup or deliver to an E-waste drop center."
+        "Schedule a specialized Recynova doorstep pickup or deliver to an E-waste drop center."
       ],
       remedialAdvice: "Electronic components contain rare earth minerals, gold, and copper that can be refined and reused indefinitely.",
       pointsAwarded: 50,
@@ -973,7 +977,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`EcoCycle server running on http://0.0.0.0:${PORT}`);
+    console.log(`Recynova server running on http://0.0.0.0:${PORT}`);
   });
 }
 

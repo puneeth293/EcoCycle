@@ -17,7 +17,7 @@ export const RewardsView: React.FC = () => {
   const ecoPoints = user?.ecoPoints || 420;
 
   const badges = [
-    { title: '🌱 Eco Starter', req: 100, desc: 'Identify 5 waste items or sign up for an EcoCycle account.' },
+    { title: '🌱 Eco Starter', req: 100, desc: 'Identify 5 waste items or sign up for a Recynova account.' },
     { title: '♻️ Recycling Hero', req: 300, desc: 'Complete 3 waste pickup requests or segregate 15 items.' },
     { title: '🌍 Green Champion', req: 600, desc: 'Upload 10 verified waste photos and divert 20 kg of waste.' },
     { title: '🏆 Eco Champion', req: 1000, desc: 'Top 5% environmental steward with over 1,000 lifetime eco points.' },

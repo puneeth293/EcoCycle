@@ -151,7 +151,7 @@ export const SegregationView: React.FC = () => {
               className="px-4 py-2 rounded-2xl bg-white/90 hover:bg-white text-[#063B32] font-black text-xs flex items-center gap-2 shadow-lg border border-white/80 backdrop-blur-md transition-all hover:scale-105"
             >
               <Video className="w-4 h-4 text-emerald-600" />
-              <span>{showVideoGuide ? 'Hide 4-Stage Lifecycle Video' : 'Watch 4-Stage EcoCycle Video (Segregate • Collect • Recycle • Reuse)'}</span>
+              <span>{showVideoGuide ? 'Hide 4-Stage Lifecycle Video' : 'Watch 4-Stage Recynova Video (Segregate • Collect • Recycle • Reuse)'}</span>
               {showVideoGuide ? <ChevronUp className="w-3.5 h-3.5 text-emerald-600" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-600" />}
             </button>
           </div>

@@ -49,7 +49,7 @@ export const AdminView: React.FC = () => {
               </span>
             </div>
             <h1 className="text-3xl font-black text-[#063B32] mt-2">
-              EcoCycle Operations Management
+              Recynova Operations Management
             </h1>
             <p className="text-xs text-[#365A52] mt-1 font-semibold">
               Monitor municipal collection requests, dispatch trucks, and oversee facility network metrics.

@@ -85,7 +85,7 @@ export const PickupView: React.FC = () => {
             Schedule Online Waste Pickup
           </h1>
           <p className="text-base font-semibold text-emerald-50/90 mt-2 max-w-2xl mx-auto leading-relaxed drop-shadow-xs">
-            Request authorized municipal or EcoCycle collection trucks right to your doorstep. Earn <strong className="text-white underline decoration-emerald-400 font-black">+30 Eco Points</strong> per completed pickup!
+            Request authorized municipal or Recynova collection trucks right to your doorstep. Earn <strong className="text-white underline decoration-emerald-400 font-black">+30 Eco Points</strong> per completed pickup!
           </p>
         </div>
 
@@ -259,7 +259,7 @@ export const PickupView: React.FC = () => {
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g. Puneeth"
+                    placeholder="Enter your full name"
                     className="w-full px-4 py-2.5 rounded-xl bg-white border border-emerald-200 text-[#063B32] text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
@@ -273,7 +273,7 @@ export const PickupView: React.FC = () => {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. user@ecocycle.org"
+                    placeholder="e.g. user@recynova.org"
                     className="w-full px-4 py-2.5 rounded-xl bg-white border border-emerald-200 text-[#063B32] text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>

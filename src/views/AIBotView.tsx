@@ -51,7 +51,7 @@ const PRESET_TOPICS = [
     queries: [
       'How much discount do I get per Eco Point on electricity bills?',
       'Which electricity boards (BESCOM, Tata Power) are supported?',
-      'Do I get bonus points for paying bills via EcoCycle?'
+      'Do I get bonus points for paying bills via Recynova?'
     ]
   },
   {
@@ -81,7 +81,7 @@ const PRESET_TOPICS = [
 export const AIBotView: React.FC = () => {
   const { navigate, user, showToast } = useApp();
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    const saved = localStorage.getItem('ecocycle_chat_history');
+    const saved = localStorage.getItem('recynova_chat_history') || localStorage.getItem('ecocycle_chat_history');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -98,6 +98,7 @@ export const AIBotView: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    localStorage.setItem('recynova_chat_history', JSON.stringify(messages));
     localStorage.setItem('ecocycle_chat_history', JSON.stringify(messages));
     scrollToBottom();
   }, [messages]);
