@@ -392,24 +392,18 @@ Filename or hint: "${itemNameHint || "None"}".
 Location reported: "${location || "Local municipality"}".
 
 TASK:
-1. Examine the visual features in the photograph and identify the EXACT physical item or environmental condition present.
-   - For example: paper sheet, newspaper, cardboard box, plastic water bottle, soft drink bottle, plastic jar, aluminium soda can, food scraps, banana peel, lithium battery, smartphone, electrical wire, cloth, aerosol spray can, chemical bottle, etc.
-   - Or if an environmental incident: factory chimney smoke plume, toxic smog, chemical foam in river/lake, illegal garbage dump on soil.
-2. If it is waste, correctly classify the item into one of the 5 municipal segregation categories:
-   - "Recyclable Waste" or "Dry Waste" (Blue Bin 🔵) -> Clean paper, newspapers, cardboard, clean PET/HDPE plastic bottles, glass bottles, aluminium cans, metal tins.
-   - "Wet Waste" (Green Bin 🟢) -> Biodegradable food scraps, fruit/vegetable peels, leftover food, tea leaves, garden leaves.
-   - "E-Waste" (Yellow Bin 🟡) -> Old mobile phones, chargers, wires, circuits, computer parts, lithium batteries.
-   - "Hazardous Waste" (Red Bin 🔴) -> Paint containers, chemical cleaners, pesticides, expired medicines, broken fluorescent bulbs.
-   - "Sanitary / Inert Waste" (Black Bin ⚫) -> Diapers, hygiene items, sweepings.
-3. If it is pollution:
-   - "Air Pollution" (smoke, smog, garbage burning)
-   - "Water Pollution" (chemical effluents, frothing river, plastic-choked lake)
-   - "Soil Pollution" (dumpsite, toxic leachate on land)
+1. Examine the visual features in the photograph and identify the EXACT physical item or environmental condition present. Pay special attention to identifying:
+   - PAPERS: office paper sheets, newspapers, notebooks, books, corrugated cardboard box, envelopes, paper cups, egg cartons, cartons, shredded paper, flyers, printed documents. Classify as "Recyclable Waste" (Blue Bin 🔵).
+   - BOTTLES & CONTAINERS: plastic water bottles (PET), soda/cold-drink bottles, detergent/shampoo bottles, plastic jars, mineral water jugs, glass bottles (beer, wine, beverage, sauce jars), aluminum soda cans. Classify as "Recyclable Waste" (Blue Bin 🔵).
+   - ELECTRONIC DEVICES (E-WASTE): mobile phones, smartphones, chargers, USB cords, power cables, laptops, tablets, computer mice, keyboards, earbuds, headphones, lithium batteries, alkaline batteries, remote controls, circuit boards, electronic appliances. Classify as "E-Waste" (Yellow Bin 🟡).
+   - WET / ORGANIC WASTE: fruit peels (banana, apple, citrus), vegetable trimmings, leftover food, tea leaves, compostable matter. Classify as "Wet Waste" (Green Bin 🟢).
+   - DOMESTIC HAZARDOUS: paints, chemical solvents, pesticide cans, aerosol spray cans, expired medicines. Classify as "Hazardous Waste" (Red Bin 🔴).
+   - POLLUTION: industrial chimney smoke (Air Pollution), foaming river/lake effluent (Water Pollution), illegal open garbage dumpsite (Soil Pollution).
 
-4. Return strictly a JSON object with this schema:
+2. Return strictly a JSON object with this schema:
 {
   "reportType": "waste" | "air-pollution" | "water-pollution" | "soil-pollution",
-  "detectedTitle": string (e.g. "Recyclable Office Paper & Documents" or "Crushed PET Plastic Bottle" or "Corrugated Cardboard Box" or "Organic Banana Peel & Food Waste"),
+  "detectedTitle": string (e.g. "Recyclable Office Paper & Documents" or "PET Plastic Water Bottle" or "Smartphone / Mobile Electronic Device" or "Corrugated Cardboard Box"),
   "categoryOrDomain": string (e.g. "Recyclable Waste", "Wet Waste", "Dry Waste", "E-Waste", "Hazardous Waste", "Air Pollution", "Water Pollution", "Soil Pollution"),
   "binColor": "Blue" | "Green" | "Yellow" | "Red" | "Black" (or null if pollution),
   "binName": "Blue Bin 🔵" | "Green Bin 🟢" | "Yellow Bin 🟡" | "Red Bin 🔴" | "Black Bin ⚫" (or null if pollution),
@@ -418,35 +412,48 @@ TASK:
   "sourceOfPollution": string,
   "aqiImpact": string,
   "contaminantsIdentified": string[],
-  "conditionNotes": string (1-2 sentences evaluating item state, cleanliness, or pollution density),
+  "conditionNotes": string (1-2 sentences evaluating item state, cleanliness, material grade, or pollution density),
   "actionSteps": string[] (3 clear actionable steps for the citizen),
-  "remedialAdvice": string (1-2 sentences on how this is recycled or mitigated),
+  "remedialAdvice": string (1-2 sentences on how this is recycled, refined, or mitigated),
   "pointsAwarded": number (35-75),
   "co2SavedKg": number,
   "ticketId": string,
   "funFact": string
 }`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: [
-          {
-            inlineData: {
-              data: imagePayload.base64Data,
-              mimeType: imagePayload.mimeType,
-            },
-          },
-          prompt,
-        ],
-        config: {
-          responseMimeType: "application/json",
-        },
-      });
+      const visionModels = ["gemini-flash-lite-latest", "gemini-3.8-flash"];
+      let aiResponseText = "";
 
-      const jsonText = response.text ? response.text.trim() : "";
-      if (jsonText) {
+      for (const modelName of visionModels) {
         try {
-          const parsed = JSON.parse(jsonText);
+          const response = await ai.models.generateContent({
+            model: modelName,
+            contents: [
+              {
+                inlineData: {
+                  data: imagePayload.base64Data,
+                  mimeType: imagePayload.mimeType,
+                },
+              },
+              prompt,
+            ],
+            config: {
+              responseMimeType: "application/json",
+            },
+          });
+
+          if (response.text) {
+            aiResponseText = response.text.trim();
+            break;
+          }
+        } catch (modelErr: any) {
+          console.warn(`Vision model ${modelName} returned error:`, modelErr?.message || modelErr?.status || modelErr);
+        }
+      }
+
+      if (aiResponseText) {
+        try {
+          const parsed = JSON.parse(aiResponseText);
           return res.json({ ...parsed, source: "gemini-vision" });
         } catch (e) {
           console.warn("JSON parse error from vision output, using fallback:", e);
@@ -552,9 +559,93 @@ function generateFallbackMultiDomainAnalysis(queryHint: string, reportCategory: 
     };
   }
 
-  // Paper & Cardboard Detection
-  if (q.includes("paper") || q.includes("cardboard") || q.includes("box") || q.includes("carton") || q.includes("news") || q.includes("book") || q.includes("sheet") || q.includes("document") || q.includes("envelope") || q.includes("notebook")) {
-    const isCardboard = q.includes("cardboard") || q.includes("box") || q.includes("carton");
+  // 1. Electronic Devices & E-Waste Detection (Mobile phones, chargers, batteries, laptops, accessories)
+  if (
+    q.includes("phone") || q.includes("mobile") || q.includes("smartphone") || q.includes("cell") ||
+    q.includes("electronic") || q.includes("device") || q.includes("gadget") || q.includes("battery") ||
+    q.includes("cable") || q.includes("wire") || q.includes("cord") || q.includes("charger") ||
+    q.includes("laptop") || q.includes("tablet") || q.includes("circuit") || q.includes("pcb") ||
+    q.includes("earbud") || q.includes("headphone") || q.includes("earphone") || q.includes("mouse") ||
+    q.includes("keyboard") || q.includes("remote") || q.includes("screen") || q.includes("display") ||
+    q.includes("adapter") || q.includes("plug") || q.includes("hardware") || q.includes("computer") ||
+    q.includes("e-waste") || q.includes("ewaste") || q.includes("appliance")
+  ) {
+    const isPhone = q.includes("phone") || q.includes("mobile") || q.includes("smartphone");
+    const isCharger = q.includes("charger") || q.includes("cable") || q.includes("wire") || q.includes("cord") || q.includes("adapter");
+    const isBattery = q.includes("battery");
+    const detectedTitle = isPhone 
+      ? "Smartphone / Mobile Electronic Device" 
+      : isCharger 
+      ? "Electronic Power Cable & Adapter" 
+      : isBattery 
+      ? "Lithium / Rechargeable Battery Cell" 
+      : "Electronic Device / E-Waste Component";
+
+    return {
+      reportType: "waste",
+      detectedTitle,
+      categoryOrDomain: "E-Waste",
+      binColor: "Yellow",
+      binName: "Yellow Bin 🟡",
+      confidenceScore: 99,
+      severityLevel: "Moderate",
+      sourceOfPollution: "Discarded electronic circuitry, silicon chips, and rechargeable components",
+      contaminantsIdentified: ["Lithium", "Cobalt", "Gold / Copper Traces", "Lead-tin solder"],
+      conditionNotes: "High-grade recyclable electronic circuit and battery/metal housing identified for safe recovery.",
+      actionSteps: [
+        "Store in a dry, moisture-free container at room temperature away from direct sunlight.",
+        "Tape over exposed battery terminals or connectors to prevent accidental short-circuits.",
+        "Deposit in the Yellow E-Waste Bin or book a Recynova doorstep E-Waste specialist pickup."
+      ],
+      remedialAdvice: "Electronic devices contain precious metals like gold, silver, and copper. Specialized hydrometallurgical refining recycles 98% of components back into high-tech manufacturing.",
+      pointsAwarded: 60,
+      co2SavedKg: 1.65,
+      ticketId: randTicket,
+      funFact: "Recycling 1 million smartphones recovers approximately 35,000 lbs of copper, 772 lbs of silver, and 75 lbs of gold!"
+    };
+  }
+
+  // 2. Plastic Bottles & Containers Detection
+  if (
+    q.includes("bottle") || q.includes("bottles") || q.includes("pet") || q.includes("water") ||
+    q.includes("soda") || q.includes("plastic") || q.includes("jug") || q.includes("container") ||
+    q.includes("shampoo") || q.includes("coke") || q.includes("pepsi") || q.includes("sprite") ||
+    q.includes("beverage") || q.includes("flask") || q.includes("canister") || q.includes("vial") ||
+    q.includes("detergent") || q.includes("tub")
+  ) {
+    return {
+      reportType: "waste",
+      detectedTitle: "PET Plastic Water & Beverage Bottle",
+      categoryOrDomain: "Recyclable Waste",
+      binColor: "Blue",
+      binName: "Blue Bin 🔵",
+      confidenceScore: 98,
+      severityLevel: "Low",
+      sourceOfPollution: "Polyethylene Terephthalate polymer (Resin #1)",
+      contaminantsIdentified: ["Recyclable thermoplastic PET polymer"],
+      conditionNotes: "Clear, clean plastic beverage container. Empty and ready for mechanical processing.",
+      actionSteps: [
+        "Rinse out any residual liquid with a quick splash of water.",
+        "Unscrew cap and crush the bottle body flat to reduce volume.",
+        "Deposit in the dry recyclables Blue Bin."
+      ],
+      remedialAdvice: "Recycled PET bottles are shredded into clean flakes and spun into high-tensile polyester yarns for eco-clothing and textiles.",
+      pointsAwarded: 40,
+      co2SavedKg: 0.65,
+      ticketId: randTicket,
+      funFact: "It takes just 5 recycled plastic bottles to create enough polyester fiber for a new athletic T-shirt!"
+    };
+  }
+
+  // 3. Paper & Cardboard Detection
+  if (
+    q.includes("paper") || q.includes("papers") || q.includes("cardboard") || q.includes("box") ||
+    q.includes("boxes") || q.includes("carton") || q.includes("news") || q.includes("book") ||
+    q.includes("sheet") || q.includes("document") || q.includes("envelope") || q.includes("notebook") ||
+    q.includes("print") || q.includes("page") || q.includes("flyer") || q.includes("magazine") ||
+    q.includes("receipt") || q.includes("stationery")
+  ) {
+    const isCardboard = q.includes("cardboard") || q.includes("box") || q.includes("carton") || q.includes("boxes");
     return {
       reportType: "waste",
       detectedTitle: isCardboard ? "Corrugated Cardboard Packaging Box" : "Recyclable Office Paper & Documents",
@@ -579,33 +670,7 @@ function generateFallbackMultiDomainAnalysis(queryHint: string, reportCategory: 
     };
   }
 
-  // Plastic Bottles & Containers
-  if (q.includes("bottle") || q.includes("pet") || q.includes("water") || q.includes("soda") || q.includes("plastic") || q.includes("jug") || q.includes("container") || q.includes("shampoo")) {
-    return {
-      reportType: "waste",
-      detectedTitle: "PET Plastic Water & Beverage Bottle",
-      categoryOrDomain: "Recyclable Waste",
-      binColor: "Blue",
-      binName: "Blue Bin 🔵",
-      confidenceScore: 98,
-      severityLevel: "Low",
-      sourceOfPollution: "Polyethylene Terephthalate polymer (Resin #1)",
-      contaminantsIdentified: ["Recyclable thermoplastic PET plastic"],
-      conditionNotes: "Clear, clean plastic beverage container. Empty and ready for mechanical processing.",
-      actionSteps: [
-        "Rinse out any residual liquid with a quick splash of water.",
-        "Unscrew cap and crush the bottle body flat to reduce volume.",
-        "Deposit in the dry recyclables Blue Bin."
-      ],
-      remedialAdvice: "Recycled PET bottles are shredded into clean flakes and spun into high-tensile polyester yarns for eco-clothing and textiles.",
-      pointsAwarded: 40,
-      co2SavedKg: 0.65,
-      ticketId: randTicket,
-      funFact: "It takes just 5 recycled plastic bottles to create enough polyester fiber for a new athletic T-shirt!"
-    };
-  }
-
-  // Glass Jars & Bottles
+  // 4. Glass Jars & Bottles
   if (q.includes("glass") || q.includes("jar") || q.includes("wine") || q.includes("beer")) {
     return {
       reportType: "waste",
@@ -631,7 +696,7 @@ function generateFallbackMultiDomainAnalysis(queryHint: string, reportCategory: 
     };
   }
 
-  // Domestic Hazardous Waste
+  // 5. Domestic Hazardous Waste
   if (q.includes("chemical") || q.includes("paint") || q.includes("medicine") || q.includes("spray") || q.includes("pesticide") || q.includes("aerosol") || q.includes("hazardous") || q.includes("solvent")) {
     return {
       reportType: "waste",
@@ -657,8 +722,8 @@ function generateFallbackMultiDomainAnalysis(queryHint: string, reportCategory: 
     };
   }
 
-  // Default Waste Classification Heuristics
-  if (q.includes("peel") || q.includes("banana") || q.includes("food") || q.includes("vegetable") || q.includes("fruit") || q.includes("apple") || q.includes("organic") || q.includes("leaf")) {
+  // 6. Wet Waste & Food Scraps
+  if (q.includes("peel") || q.includes("banana") || q.includes("food") || q.includes("vegetable") || q.includes("fruit") || q.includes("apple") || q.includes("organic") || q.includes("leaf") || q.includes("tea")) {
     return {
       reportType: "waste",
       detectedTitle: "Organic Kitchen & Fruit Scraps",
@@ -683,32 +748,8 @@ function generateFallbackMultiDomainAnalysis(queryHint: string, reportCategory: 
     };
   }
 
-  if (q.includes("battery") || q.includes("phone") || q.includes("cable") || q.includes("electronic") || q.includes("circuit") || q.includes("laptop") || q.includes("charger")) {
-    return {
-      reportType: "waste",
-      detectedTitle: "Electronic Device / E-Waste Component",
-      categoryOrDomain: "E-Waste",
-      binColor: "Yellow",
-      binName: "Yellow Bin 🟡",
-      confidenceScore: 98,
-      severityLevel: "Moderate",
-      sourceOfPollution: "Discarded electronic circuitry and rechargeable cell",
-      contaminantsIdentified: ["Lithium", "Cobalt", "Lead-tin solder", "Copper"],
-      conditionNotes: "High-grade recyclable electronic circuit and battery casing identified.",
-      actionSteps: [
-        "Store in a moisture-free container at room temperature.",
-        "Tape over exposed battery terminals to prevent short-circuits.",
-        "Schedule a specialized Recynova doorstep pickup or deliver to an E-waste drop center."
-      ],
-      remedialAdvice: "Electronic components contain rare earth minerals, gold, and copper that can be refined and reused indefinitely.",
-      pointsAwarded: 50,
-      co2SavedKg: 1.45,
-      ticketId: randTicket,
-      funFact: "Recycling 1 million smartphones recovers approximately 35,000 lbs of copper and 772 lbs of silver!"
-    };
-  }
-
-  if (q.includes("can") || q.includes("metal") || q.includes("tin") || q.includes("aluminum") || q.includes("foil")) {
+  // 7. Metal Cans & Aluminum
+  if (q.includes("can") || q.includes("cans") || q.includes("metal") || q.includes("tin") || q.includes("aluminum") || q.includes("foil")) {
     return {
       reportType: "waste",
       detectedTitle: "Aluminum Beverage Container",

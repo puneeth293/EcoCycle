@@ -19,46 +19,53 @@ import {
 
 const SAMPLE_REPORTS = [
   {
-    name: 'PET Beverage Bottle',
+    name: '📄 Office Papers & Documents',
     type: 'waste' as ReportCategory,
-    categoryName: 'Recyclable Waste',
-    hint: 'PET plastic beverage bottle',
+    categoryName: 'Recyclable Waste (Blue Bin 🔵)',
+    hint: 'Recyclable clean office paper sheets and printed documents',
+    url: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=600&auto=format&fit=crop&q=80',
+  },
+  {
+    name: '🧴 PET Plastic Water Bottle',
+    type: 'waste' as ReportCategory,
+    categoryName: 'Recyclable Waste (Blue Bin 🔵)',
+    hint: 'PET plastic clear drinking water bottle',
     url: 'https://images.unsplash.com/photo-1527011046414-4781f1f94f8c?w=600&auto=format&fit=crop&q=80',
   },
   {
-    name: 'Organic Kitchen Peels',
+    name: '📱 Smartphone & Electronic Device',
     type: 'waste' as ReportCategory,
-    categoryName: 'Wet Waste',
-    hint: 'Banana peel and organic vegetable scraps',
-    url: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=600&auto=format&fit=crop&q=80',
-  },
-  {
-    name: 'E-Waste & Batteries',
-    type: 'waste' as ReportCategory,
-    categoryName: 'E-Waste',
-    hint: 'Discarded mobile circuit and lithium battery',
+    categoryName: 'E-Waste (Yellow Bin 🟡)',
+    hint: 'Smartphone mobile phone with charger electronic device e-waste',
     url: 'https://images.unsplash.com/photo-1580910051074-3eb694886505?w=600&auto=format&fit=crop&q=80',
   },
   {
-    name: 'Industrial Smoke & Smog',
+    name: '📦 Corrugated Cardboard Box',
+    type: 'waste' as ReportCategory,
+    categoryName: 'Recyclable Waste (Blue Bin 🔵)',
+    hint: 'Corrugated cardboard shipping and packaging box',
+    url: 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=600&auto=format&fit=crop&q=80',
+  },
+  {
+    name: '🍎 Kitchen Food Scraps & Peels',
+    type: 'waste' as ReportCategory,
+    categoryName: 'Wet Waste (Green Bin 🟢)',
+    hint: 'Banana peel and organic kitchen vegetable scraps',
+    url: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=600&auto=format&fit=crop&q=80',
+  },
+  {
+    name: '💨 Industrial Chimney Smoke',
     type: 'air-pollution' as ReportCategory,
     categoryName: 'Air Pollution',
     hint: 'Dense smoke plume from factory chimney stack',
     url: 'https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=600&auto=format&fit=crop&q=80',
   },
   {
-    name: 'Chemical Runoff in Lake',
+    name: '🌊 River Chemical Foam & Froth',
     type: 'water-pollution' as ReportCategory,
     categoryName: 'Water Pollution',
     hint: 'Chemical foam and plastic trash choking municipal river',
     url: 'https://images.unsplash.com/photo-1618477461853-cf6ed80faba5?w=600&auto=format&fit=crop&q=80',
-  },
-  {
-    name: 'Illegal Landfill & Toxic Dump',
-    type: 'soil-pollution' as ReportCategory,
-    categoryName: 'Soil Pollution',
-    hint: 'Open dumpsite with synthetic waste and leachate on soil',
-    url: 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=600&auto=format&fit=crop&q=80',
   }
 ];
 
@@ -66,6 +73,7 @@ export const UploadWasteView: React.FC = () => {
   const { awardPoints, addSegregationRecord, navigate, showToast } = useApp();
   
   const [selectedCategory, setSelectedCategory] = useState<ReportCategory>('waste');
+  const [activeMaterial, setActiveMaterial] = useState<'paper' | 'bottle' | 'electronic' | 'organic' | 'glass' | 'can' | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [userNote, setUserNote] = useState('');
   const [locationText, setLocationText] = useState('Indiranagar, Bangalore (Ward 112)');
@@ -182,11 +190,23 @@ export const UploadWasteView: React.FC = () => {
 
   const processFile = (file: File) => {
     setUploadedFileName(file.name);
-    // Auto-detect descriptive filename (e.g., paper.jpg, bottle.png)
     const rawName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
-    if (!userNote && rawName.length > 2 && !/^(image|img|photo|dsc|screenshot|\d+)$/i.test(rawName)) {
+    const lowerName = rawName.toLowerCase();
+
+    // Auto-detect waste stream from filename if user hasn't typed a note yet
+    if (lowerName.includes("paper") || lowerName.includes("sheet") || lowerName.includes("news") || lowerName.includes("cardboard") || lowerName.includes("box") || lowerName.includes("doc")) {
+      setUserNote("Recyclable Office Paper & Documents");
+      setSelectedCategory('waste');
+    } else if (lowerName.includes("bottle") || lowerName.includes("pet") || lowerName.includes("water") || lowerName.includes("soda") || lowerName.includes("plastic") || lowerName.includes("shampoo")) {
+      setUserNote("PET Plastic Water & Beverage Bottle");
+      setSelectedCategory('waste');
+    } else if (lowerName.includes("phone") || lowerName.includes("mobile") || lowerName.includes("device") || lowerName.includes("electronic") || lowerName.includes("charger") || lowerName.includes("cable") || lowerName.includes("battery") || lowerName.includes("laptop")) {
+      setUserNote("Smartphone & Electronic Device (E-Waste)");
+      setSelectedCategory('waste');
+    } else if (!userNote && rawName.length > 2 && !/^(image|img|photo|dsc|screenshot|\d+)$/i.test(rawName)) {
       setUserNote(rawName);
     }
+
     const reader = new FileReader();
     reader.onload = () => {
       setSelectedImage(reader.result as string);
@@ -228,7 +248,79 @@ export const UploadWasteView: React.FC = () => {
     const q = hintText.toLowerCase();
     const randTicket = `RCY-WST-${Math.floor(10000 + Math.random() * 90000)}`;
 
-    if (q.includes("paper") || q.includes("cardboard") || q.includes("box") || q.includes("carton") || q.includes("news") || q.includes("book") || q.includes("sheet")) {
+    // 1. Electronic Devices & E-Waste
+    if (
+      q.includes("phone") || q.includes("mobile") || q.includes("smartphone") || q.includes("device") ||
+      q.includes("electronic") || q.includes("battery") || q.includes("cable") || q.includes("wire") ||
+      q.includes("charger") || q.includes("laptop") || q.includes("tablet") || q.includes("circuit") ||
+      q.includes("earbud") || q.includes("headphone") || q.includes("remote") || q.includes("mouse") ||
+      q.includes("keyboard") || q.includes("adapter") || q.includes("gadget") || q.includes("screen") ||
+      q.includes("e-waste") || q.includes("ewaste")
+    ) {
+      const isPhone = q.includes("phone") || q.includes("mobile") || q.includes("smartphone");
+      const isCharger = q.includes("charger") || q.includes("cable") || q.includes("wire") || q.includes("adapter");
+      const detectedTitle = isPhone 
+        ? "Smartphone / Mobile Electronic Device" 
+        : isCharger 
+        ? "Electronic Power Cable & Adapter" 
+        : "Electronic Device / E-Waste Component";
+
+      return {
+        id: `rep-${Date.now()}`,
+        reportType: 'waste',
+        imageUrl: imageSrc,
+        detectedTitle,
+        categoryOrDomain: "E-Waste",
+        binColor: "Yellow",
+        binName: "Yellow Bin 🟡",
+        confidenceScore: 99,
+        severityLevel: "Moderate",
+        conditionNotes: "High-grade recyclable electronic circuit and battery casing identified for safe recovery.",
+        actionSteps: ["Store in a moisture-free container at room temperature", "Tape exposed battery terminals", "Deposit in Yellow E-Waste Bin for doorstep pickup"],
+        remedialAdvice: "Electronic devices contain gold, silver, and copper. Specialized hydrometallurgical refining recycles 98% of components.",
+        pointsAwarded: 60,
+        co2SavedKg: 1.65,
+        ticketId: randTicket,
+        timestamp: new Date().toISOString().split('T')[0],
+        location: locationText
+      };
+    }
+
+    // 2. Plastic Bottles & Containers
+    if (
+      q.includes("bottle") || q.includes("bottles") || q.includes("pet") || q.includes("water") ||
+      q.includes("soda") || q.includes("plastic") || q.includes("jug") || q.includes("container") ||
+      q.includes("shampoo") || q.includes("coke") || q.includes("pepsi") || q.includes("sprite") ||
+      q.includes("beverage")
+    ) {
+      return {
+        id: `rep-${Date.now()}`,
+        reportType: 'waste',
+        imageUrl: imageSrc,
+        detectedTitle: "PET Plastic Water & Beverage Bottle",
+        categoryOrDomain: "Recyclable Waste",
+        binColor: "Blue",
+        binName: "Blue Bin 🔵",
+        confidenceScore: 98,
+        severityLevel: "Low",
+        conditionNotes: "Clear, clean plastic beverage container. Uncapped and crushed for mechanical processing.",
+        actionSteps: ["Rinse out residual beverage with a splash of water", "Unscrew cap and crush bottle flat", "Deposit in Blue Recyclables Bin"],
+        remedialAdvice: "Recycled PET bottles are shredded into clean flakes and spun into high-tensile polyester yarns for eco-textiles.",
+        pointsAwarded: 40,
+        co2SavedKg: 0.65,
+        ticketId: randTicket,
+        timestamp: new Date().toISOString().split('T')[0],
+        location: locationText
+      };
+    }
+
+    // 3. Paper & Cardboard
+    if (
+      q.includes("paper") || q.includes("papers") || q.includes("cardboard") || q.includes("box") ||
+      q.includes("boxes") || q.includes("carton") || q.includes("news") || q.includes("book") ||
+      q.includes("sheet") || q.includes("document") || q.includes("envelope") || q.includes("notebook") ||
+      q.includes("print") || q.includes("page") || q.includes("flyer") || q.includes("receipt")
+    ) {
       const isCardboard = q.includes("cardboard") || q.includes("box") || q.includes("carton");
       return {
         id: `rep-${Date.now()}`,
@@ -251,29 +343,8 @@ export const UploadWasteView: React.FC = () => {
       };
     }
 
-    if (q.includes("bottle") || q.includes("pet") || q.includes("water") || q.includes("soda") || q.includes("plastic") || q.includes("jug")) {
-      return {
-        id: `rep-${Date.now()}`,
-        reportType: 'waste',
-        imageUrl: imageSrc,
-        detectedTitle: "PET Plastic Water & Beverage Bottle",
-        categoryOrDomain: "Recyclable Waste",
-        binColor: "Blue",
-        binName: "Blue Bin 🔵",
-        confidenceScore: 98,
-        severityLevel: "Low",
-        conditionNotes: "Clear, clean plastic beverage container. Uncapped and crushed for mechanical processing.",
-        actionSteps: ["Rinse out residual beverage with water", "Unscrew cap and crush bottle flat", "Deposit in Blue Recyclables Bin"],
-        remedialAdvice: "Recycled PET bottles are shredded into clean flakes and spun into high-tensile polyester yarns for eco-textiles.",
-        pointsAwarded: 40,
-        co2SavedKg: 0.65,
-        ticketId: randTicket,
-        timestamp: new Date().toISOString().split('T')[0],
-        location: locationText
-      };
-    }
-
-    if (q.includes("peel") || q.includes("banana") || q.includes("food") || q.includes("vegetable") || q.includes("fruit") || q.includes("organic")) {
+    // 4. Food Scraps & Wet Waste
+    if (q.includes("peel") || q.includes("banana") || q.includes("food") || q.includes("vegetable") || q.includes("fruit") || q.includes("organic") || q.includes("leaf")) {
       return {
         id: `rep-${Date.now()}`,
         reportType: 'waste',
@@ -289,28 +360,6 @@ export const UploadWasteView: React.FC = () => {
         remedialAdvice: "Converts to nutrient-dense natural organic compost in 30-45 days.",
         pointsAwarded: 35,
         co2SavedKg: 0.38,
-        ticketId: randTicket,
-        timestamp: new Date().toISOString().split('T')[0],
-        location: locationText
-      };
-    }
-
-    if (q.includes("battery") || q.includes("phone") || q.includes("cable") || q.includes("electronic") || q.includes("charger")) {
-      return {
-        id: `rep-${Date.now()}`,
-        reportType: 'waste',
-        imageUrl: imageSrc,
-        detectedTitle: "Electronic Device / E-Waste Component",
-        categoryOrDomain: "E-Waste",
-        binColor: "Yellow",
-        binName: "Yellow Bin 🟡",
-        confidenceScore: 98,
-        severityLevel: "Moderate",
-        conditionNotes: "High-grade recyclable electronic circuit and battery casing identified.",
-        actionSteps: ["Store in moisture-free container", "Tape exposed battery terminals", "Deposit in Yellow E-Waste Bin"],
-        remedialAdvice: "Electronics contain rare earth minerals, gold, and copper that can be refined and reused.",
-        pointsAwarded: 50,
-        co2SavedKg: 1.45,
         ticketId: randTicket,
         timestamp: new Date().toISOString().split('T')[0],
         location: locationText
@@ -435,6 +484,7 @@ export const UploadWasteView: React.FC = () => {
     setReportResult(null);
     setUserNote('');
     setUploadedFileName('');
+    setActiveMaterial(null);
     stopCamera();
   };
 
@@ -520,34 +570,147 @@ export const UploadWasteView: React.FC = () => {
           {/* Left Column: Image Upload & Live Camera Zone */}
           <div className="lg:col-span-7 space-y-6">
             
-            <div className="glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl border border-emerald-100/90 ring-1 ring-emerald-500/10 transition-all">
+            <div className="relative rounded-3xl p-6 sm:p-8 bg-white/95 backdrop-blur-2xl shadow-2xl border-2 border-emerald-300/90 ring-4 ring-emerald-500/10 transition-all overflow-hidden">
               
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-lg font-black text-[#063B32] flex items-center gap-2">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider mb-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>AI Vision Engine Active</span>
+                  </div>
+                  <h2 className="text-xl font-black text-[#063B32] flex items-center gap-2">
                     <Camera className="w-5 h-5 text-emerald-600" />
                     <span>
-                      {selectedCategory === 'waste' && 'Upload Waste Photo (Paper, Bottle, Can, etc.)'}
+                      {selectedCategory === 'waste' && 'Upload Waste Photo (Papers, Bottles, Electronics)'}
                       {selectedCategory === 'air-pollution' && 'Report Air Pollution & Smoke'}
                       {selectedCategory === 'water-pollution' && 'Report River / Lake Water Pollution'}
                       {selectedCategory === 'soil-pollution' && 'Report Soil & Dumpsite Contamination'}
                     </span>
                   </h2>
                   <p className="text-xs text-[#365A52] font-semibold mt-0.5">
-                    AI vision automatically detects material type, segregation bin, and eco points.
+                    Recognizes physical items: <strong>Papers 📄</strong>, <strong>Bottles 🧴</strong>, and <strong>Electronic Devices 📱</strong> with verified segregation bins & rewards.
                   </p>
                 </div>
                 
                 {selectedImage && (
                   <button
                     onClick={resetScanner}
-                    className="text-xs font-bold text-slate-500 hover:text-red-500 flex items-center gap-1 transition-colors bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs"
+                    className="text-xs font-bold text-slate-600 hover:text-red-500 flex items-center gap-1 transition-colors bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs hover:border-red-200"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>Reset</span>
                   </button>
                 )}
               </div>
+
+              {/* Priority Waste Stream Target Selector: Papers, Bottles, Electronic Devices */}
+              {selectedCategory === 'waste' && (
+                <div className="mb-5 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50/90 via-teal-50/60 to-white border border-emerald-200 shadow-2xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-black uppercase text-emerald-950 tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Item Category (One-Click Target):</span>
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-white px-2 py-0.5 rounded-md border border-emerald-200 shadow-2xs">
+                      Auto-Classify or Click to Preset
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* Papers */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveMaterial('paper');
+                        setUserNote('Recyclable Office Paper & Documents');
+                        setSelectedCategory('waste');
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition-all flex flex-col gap-1 cursor-pointer ${
+                        activeMaterial === 'paper' || userNote.toLowerCase().includes('paper')
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-300 scale-[1.01]'
+                          : 'bg-white hover:bg-blue-50/60 text-slate-800 border-blue-200 shadow-2xs'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg">📄</span>
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                          activeMaterial === 'paper' || userNote.toLowerCase().includes('paper')
+                            ? 'bg-white/20 text-white'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>Blue Bin 🔵</span>
+                      </div>
+                      <span className="text-xs font-black">Papers & Docs</span>
+                      <span className={`text-[10px] leading-tight ${
+                        activeMaterial === 'paper' || userNote.toLowerCase().includes('paper') ? 'text-blue-100' : 'text-slate-500'
+                      }`}>
+                        Sheets, news, books, cardboard
+                      </span>
+                    </button>
+
+                    {/* Bottles */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveMaterial('bottle');
+                        setUserNote('PET Plastic Water & Beverage Bottle');
+                        setSelectedCategory('waste');
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition-all flex flex-col gap-1 cursor-pointer ${
+                        activeMaterial === 'bottle' || userNote.toLowerCase().includes('bottle')
+                          ? 'bg-teal-600 text-white border-teal-600 shadow-md ring-2 ring-teal-300 scale-[1.01]'
+                          : 'bg-white hover:bg-teal-50/60 text-slate-800 border-teal-200 shadow-2xs'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg">🧴</span>
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                          activeMaterial === 'bottle' || userNote.toLowerCase().includes('bottle')
+                            ? 'bg-white/20 text-white'
+                            : 'bg-teal-100 text-teal-800'
+                        }`}>Blue Bin 🔵</span>
+                      </div>
+                      <span className="text-xs font-black">Bottles & Plastic</span>
+                      <span className={`text-[10px] leading-tight ${
+                        activeMaterial === 'bottle' || userNote.toLowerCase().includes('bottle') ? 'text-teal-100' : 'text-slate-500'
+                      }`}>
+                        Water bottles, soda, shampoo
+                      </span>
+                    </button>
+
+                    {/* Electronic Devices */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveMaterial('electronic');
+                        setUserNote('Smartphone & Electronic Device (E-Waste)');
+                        setSelectedCategory('waste');
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition-all flex flex-col gap-1 cursor-pointer ${
+                        activeMaterial === 'electronic' || userNote.toLowerCase().includes('phone') || userNote.toLowerCase().includes('electronic') || userNote.toLowerCase().includes('device')
+                          ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-md ring-2 ring-amber-300 scale-[1.01]'
+                          : 'bg-white hover:bg-amber-50/60 text-slate-800 border-amber-200 shadow-2xs'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg">📱</span>
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                          activeMaterial === 'electronic' || userNote.toLowerCase().includes('phone') || userNote.toLowerCase().includes('electronic') || userNote.toLowerCase().includes('device')
+                            ? 'bg-black/20 text-slate-950 font-black'
+                            : 'bg-amber-100 text-amber-900'
+                        }`}>Yellow Bin 🟡</span>
+                      </div>
+                      <span className="text-xs font-black">Electronic Devices</span>
+                      <span className={`text-[10px] leading-tight ${
+                        activeMaterial === 'electronic' || userNote.toLowerCase().includes('phone') || userNote.toLowerCase().includes('electronic') || userNote.toLowerCase().includes('device')
+                          ? 'text-amber-950 font-semibold'
+                          : 'text-slate-500'
+                      }`}>
+                        Smartphones, chargers, cables
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Upload Drop Zone / Camera Display */}
               {!selectedImage && !isCameraActive && (
@@ -681,34 +844,48 @@ export const UploadWasteView: React.FC = () => {
 
                   {/* Quick Material Category Chips */}
                   <div className="space-y-1.5 pt-1">
-                    <span className="text-[11px] font-black uppercase text-[#063B32] tracking-wider block">
-                      Quick Material Hint (Optional):
-                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black uppercase text-[#063B32] tracking-wider block">
+                        Verify Waste Type (1-Click Selection):
+                      </span>
+                      {userNote && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                          Active Hint: {userNote}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       {[
-                        { label: '📄 Paper / Sheets', hint: 'Recyclable paper sheets and documents' },
-                        { label: '📦 Cardboard Box', hint: 'Cardboard packaging box' },
-                        { label: '🧴 Plastic Bottle', hint: 'PET plastic beverage bottle' },
-                        { label: '🥫 Metal Can', hint: 'Aluminum drink can' },
-                        { label: '🍌 Food / Fruit Peel', hint: 'Organic food and vegetable peels' },
-                        { label: '🔌 E-Waste / Battery', hint: 'Electronic component or battery' }
-                      ].map((item, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            setUserNote(item.hint);
-                            setSelectedCategory('waste');
-                          }}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                            userNote.toLowerCase().includes(item.label.slice(2).trim().toLowerCase().split(' ')[0])
-                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                              : 'bg-white hover:bg-emerald-50 text-[#063B32] border-emerald-200'
-                          }`}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
+                        { key: 'paper', label: '📄 Papers & Documents', hint: 'Recyclable Office Paper & Documents' },
+                        { key: 'bottle', label: '🧴 Plastic Bottles', hint: 'PET Plastic Water & Beverage Bottle' },
+                        { key: 'electronic', label: '📱 Electronic Devices', hint: 'Smartphone & Electronic Device (E-Waste)' },
+                        { key: 'cardboard', label: '📦 Cardboard Boxes', hint: 'Corrugated Cardboard Packaging Box' },
+                        { key: 'food', label: '🍎 Food / Peels', hint: 'Organic Kitchen & Fruit Scraps' },
+                        { key: 'can', label: '🥫 Metal Cans', hint: 'Aluminum Beverage Container' }
+                      ].map((item, idx) => {
+                        const isMatch = (activeMaterial === item.key) || 
+                          (item.key === 'paper' && userNote.toLowerCase().includes('paper')) || 
+                          (item.key === 'bottle' && userNote.toLowerCase().includes('bottle')) || 
+                          (item.key === 'electronic' && (userNote.toLowerCase().includes('phone') || userNote.toLowerCase().includes('electronic') || userNote.toLowerCase().includes('device')));
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              setActiveMaterial(item.key as any);
+                              setUserNote(item.hint);
+                              setSelectedCategory('waste');
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                              isMatch
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-300'
+                                : 'bg-white hover:bg-emerald-50 text-[#063B32] border-emerald-200 shadow-2xs'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
