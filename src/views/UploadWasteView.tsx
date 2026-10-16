@@ -488,6 +488,33 @@ export const UploadWasteView: React.FC = () => {
     stopCamera();
   };
 
+  const handleDeleteReport = (id: string) => {
+    setReportHistory((prev) => {
+      const updated = prev.filter((item) => item.id !== id);
+      try {
+        localStorage.setItem('recynova_environmental_reports', JSON.stringify(updated));
+        localStorage.setItem('ecocycle_environmental_reports', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to save updated reports to localStorage', e);
+      }
+      return updated;
+    });
+    showToast('Photo report deleted from history', 'info');
+  };
+
+  const handleClearAllReports = () => {
+    if (window.confirm('Delete all photo reports from your history log?')) {
+      setReportHistory([]);
+      try {
+        localStorage.removeItem('recynova_environmental_reports');
+        localStorage.removeItem('ecocycle_environmental_reports');
+      } catch (e) {
+        console.warn('Failed to clear reports from localStorage', e);
+      }
+      showToast('All photo reports deleted', 'info');
+    }
+  };
+
   const filteredHistory = reportHistory.filter((item) => {
     if (historyFilter === 'all') return true;
     return item.reportType === historyFilter;
@@ -807,6 +834,18 @@ export const UploadWasteView: React.FC = () => {
                       alt="Selected upload"
                       className="max-h-96 w-full object-contain"
                     />
+
+                    {!isScanning && (
+                      <button
+                        type="button"
+                        onClick={resetScanner}
+                        title="Delete this photo"
+                        className="absolute top-3 right-3 px-3 py-1.5 rounded-xl bg-red-600/90 hover:bg-red-600 text-white text-xs font-bold shadow-lg flex items-center gap-1.5 backdrop-blur-sm transition-all hover:scale-105 active:scale-95 cursor-pointer z-10"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Photo</span>
+                      </button>
+                    )}
 
                     {isScanning && (
                       <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center text-white space-y-4">
@@ -1168,90 +1207,127 @@ export const UploadWasteView: React.FC = () => {
         </div>
 
         {/* History of Reports Section: White Glass Panel */}
-        <div className="glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl">
+        <div className="relative rounded-3xl p-6 sm:p-8 bg-white/95 backdrop-blur-2xl shadow-2xl border-2 border-emerald-200/90 ring-4 ring-emerald-500/10 transition-all overflow-hidden">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
             <div>
               <h2 className="text-xl font-black text-[#063B32] flex items-center gap-2">
                 <History className="w-5 h-5 text-emerald-600" />
                 <span>Your Environmental Verification & Report Log</span>
               </h2>
-              <p className="text-xs text-[#365A52] font-semibold">
-                All photos inspected and rewarded by Recynova AI
+              <p className="text-xs text-[#365A52] font-semibold mt-0.5">
+                All photos inspected and rewarded by Recynova AI. You can delete any photo or report from your log.
               </p>
             </div>
 
-            {/* Filter buttons */}
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => setHistoryFilter('all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors ${
-                  historyFilter === 'all'
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-white text-[#063B32] border border-emerald-100'
-                }`}
-              >
-                All ({reportHistory.length})
-              </button>
-              <button
-                onClick={() => setHistoryFilter('waste')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors ${
-                  historyFilter === 'waste'
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-white text-[#063B32] border border-emerald-100'
-                }`}
-              >
-                🗑️ Waste
-              </button>
-              <button
-                onClick={() => setHistoryFilter('air-pollution')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors ${
-                  historyFilter === 'air-pollution'
-                    ? 'bg-sky-600 text-white'
-                    : 'bg-white text-[#063B32] border border-emerald-100'
-                }`}
-              >
-                💨 Air
-              </button>
-              <button
-                onClick={() => setHistoryFilter('water-pollution')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors ${
-                  historyFilter === 'water-pollution'
-                    ? 'bg-cyan-600 text-white'
-                    : 'bg-white text-[#063B32] border border-emerald-100'
-                }`}
-              >
-                🌊 Water
-              </button>
-              <button
-                onClick={() => setHistoryFilter('soil-pollution')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors ${
-                  historyFilter === 'soil-pollution'
-                    ? 'bg-amber-600 text-white'
-                    : 'bg-white text-[#063B32] border border-emerald-100'
-                }`}
-              >
-                🌱 Soil
-              </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Filter buttons */}
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setHistoryFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors cursor-pointer ${
+                    historyFilter === 'all'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-white text-[#063B32] border border-emerald-200 hover:bg-emerald-50'
+                  }`}
+                >
+                  All ({reportHistory.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryFilter('waste')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors cursor-pointer ${
+                    historyFilter === 'waste'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-white text-[#063B32] border border-emerald-200 hover:bg-emerald-50'
+                  }`}
+                >
+                  🗑️ Waste
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryFilter('air-pollution')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors cursor-pointer ${
+                    historyFilter === 'air-pollution'
+                      ? 'bg-sky-600 text-white shadow-xs'
+                      : 'bg-white text-[#063B32] border border-emerald-200 hover:bg-emerald-50'
+                  }`}
+                >
+                  💨 Air
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryFilter('water-pollution')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors cursor-pointer ${
+                    historyFilter === 'water-pollution'
+                      ? 'bg-cyan-600 text-white shadow-xs'
+                      : 'bg-white text-[#063B32] border border-emerald-200 hover:bg-emerald-50'
+                  }`}
+                >
+                  🌊 Water
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryFilter('soil-pollution')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors cursor-pointer ${
+                    historyFilter === 'soil-pollution'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'bg-white text-[#063B32] border border-emerald-200 hover:bg-emerald-50'
+                  }`}
+                >
+                  🌱 Soil
+                </button>
+              </div>
+
+              {/* Clear All Reports Button */}
+              {reportHistory.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAllReports}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-red-600 hover:text-white hover:bg-red-600 bg-red-50 border border-red-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  title="Delete all photo reports"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Clear All</span>
+                </button>
+              )}
             </div>
           </div>
 
           {filteredHistory.length === 0 ? (
-            <div className="text-center py-10 text-[#365A52] text-xs font-semibold">
-              No reports in this category yet. Upload a photo above to log your first verified submission!
+            <div className="text-center py-12 text-[#365A52] text-xs font-semibold bg-emerald-50/50 rounded-2xl border border-dashed border-emerald-200">
+              <p className="font-bold text-emerald-950 text-sm">No photo reports in this category.</p>
+              <p className="mt-1 text-slate-500">Upload a waste or pollution photograph above to log your verified submission!</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredHistory.map((item) => (
                 <div
                   key={item.id}
-                  className="glass-card glass-card-hover rounded-2xl border border-white/80 overflow-hidden flex flex-col justify-between shadow-md"
+                  className="glass-card glass-card-hover rounded-2xl border border-white/90 overflow-hidden flex flex-col justify-between shadow-md hover:shadow-xl transition-all"
                 >
-                  <div className="relative h-36 bg-black">
+                  <div className="relative h-36 bg-black group/photo">
                     <img
                       src={item.imageUrl}
                       alt={item.detectedTitle}
                       className="w-full h-full object-cover"
                     />
+
+                    {/* Delete Photo Button directly on image */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteReport(item.id);
+                      }}
+                      title="Delete this photo report"
+                      aria-label="Delete this photo report"
+                      className="absolute top-2 left-2 px-2.5 py-1 rounded-xl bg-black/65 hover:bg-red-600 text-white shadow-lg transition-all hover:scale-105 active:scale-95 cursor-pointer z-10 flex items-center gap-1 group/del backdrop-blur-xs border border-white/20"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-white" />
+                      <span className="text-[10px] font-bold">Delete Photo</span>
+                    </button>
+
                     <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-black shadow-xs">
                       +{item.pointsAwarded} Pts
                     </div>
@@ -1272,7 +1348,18 @@ export const UploadWasteView: React.FC = () => {
 
                     <div className="pt-2 border-t border-emerald-100 flex items-center justify-between text-[10px] text-[#365A52] font-mono">
                       <span>{item.timestamp}</span>
-                      {item.ticketId && <span>{item.ticketId}</span>}
+                      <div className="flex items-center gap-2">
+                        {item.ticketId && <span>{item.ticketId}</span>}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteReport(item.id)}
+                          className="text-red-500 hover:text-red-700 font-sans font-bold flex items-center gap-1 hover:underline cursor-pointer"
+                          title="Delete report"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Delete</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
