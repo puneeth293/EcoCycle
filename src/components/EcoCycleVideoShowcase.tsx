@@ -14,9 +14,12 @@ import {
   Sun,
   Wind,
   Layers,
-  Repeat
+  Repeat,
+  Zap,
+  Signal
 } from 'lucide-react';
 import ecocycleLoopVideo from '../assets/videos/ecocycle_loop.mp4';
+import { useNetworkQuality } from '../hooks/useNetworkQuality';
 
 const STORAGE_KEY = 'recynova_permanent_video_url';
 
@@ -31,21 +34,44 @@ export const EcoCycleVideoShowcase: React.FC<EcoCycleVideoShowcaseProps> = ({
   className = '',
   compact = false
 }) => {
+  const { speedTier, isDataSaver } = useNetworkQuality();
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
   const [activeStep, setActiveStep] = useState<number>(0);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(8.3);
-  const [activeVideoUrl, setActiveVideoUrl] = useState<string>(() => {
-    return (
-      videoSrc || 
-      localStorage.getItem(STORAGE_KEY) || 
-      ecocycleLoopVideo || 
-      '/videos/ecocycle_loop.mp4'
-    );
+  const [streamQuality, setStreamQuality] = useState<'hd' | 'lite'>(() => {
+    return isDataSaver || speedTier === '3g' || speedTier === '2g' ? 'lite' : 'hd';
   });
+
+  const [activeVideoUrl, setActiveVideoUrl] = useState<string>(() => {
+    if (videoSrc) return videoSrc;
+    const custom = localStorage.getItem(STORAGE_KEY);
+    if (custom) return custom;
+    return isDataSaver || speedTier === '3g' || speedTier === '2g' 
+      ? '/videos/ecocycle_loop_lite.mp4' 
+      : (ecocycleLoopVideo || '/videos/ecocycle_loop.mp4');
+  });
+
   const [showUrlInput, setShowUrlInput] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Adapt stream if user hasn't set a custom URL
+  const toggleQuality = () => {
+    const nextQuality = streamQuality === 'hd' ? 'lite' : 'hd';
+    setStreamQuality(nextQuality);
+    const targetUrl = nextQuality === 'lite' 
+      ? '/videos/ecocycle_loop_lite.mp4' 
+      : (ecocycleLoopVideo || '/videos/ecocycle_loop.mp4');
+    
+    setActiveVideoUrl(targetUrl);
+    if (videoRef.current) {
+      const cur = videoRef.current.currentTime;
+      videoRef.current.src = targetUrl;
+      videoRef.current.currentTime = cur;
+      videoRef.current.play().catch(() => {});
+    }
+  };
 
   const steps = [
     {
@@ -312,10 +338,12 @@ export const EcoCycleVideoShowcase: React.FC<EcoCycleVideoShowcaseProps> = ({
         id="ecocycle-video-container"
         className="relative rounded-2xl overflow-hidden aspect-video bg-slate-950 shadow-2xl group border border-white/40 select-none"
       >
-        {/* HTML5 Loop Video */}
+        {/* HTML5 Loop Video with Network Speed Adaptation */}
         <video
           ref={videoRef}
           src={activeVideoUrl}
+          poster="/videos/ecocycle_poster.jpg"
+          preload={isDataSaver || speedTier === '3g' ? 'metadata' : 'auto'}
           className="w-full h-full object-cover"
           autoPlay
           loop
@@ -346,15 +374,36 @@ export const EcoCycleVideoShowcase: React.FC<EcoCycleVideoShowcaseProps> = ({
           </div>
         </div>
 
-        {/* Top Right Current Step Badge */}
-        <div className="absolute top-3 right-3 sm:top-4 sm:right-4 bg-slate-950/85 backdrop-blur-md text-white px-3 py-1.5 rounded-xl border border-white/20 shadow-xl text-left pointer-events-none">
-          <div className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-            <span>{steps[activeStep]?.badge || 'Recynova System'}</span>
+        {/* Top Right Current Step & Network Quality Switcher */}
+        <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-2">
+          {/* Quality Stream Switcher */}
+          <button
+            onClick={toggleQuality}
+            className="pointer-events-auto px-2.5 py-1 rounded-xl bg-slate-950/85 hover:bg-slate-900 backdrop-blur-md border border-white/25 text-white flex items-center gap-1 text-[10px] sm:text-[11px] font-bold shadow-lg transition-all hover:scale-105 active:scale-95"
+            title={`Current Stream: ${streamQuality === 'hd' ? '5G HD (1080p, 3.1MB)' : '4G/3G Lite (480p, 990KB)'}. Click to switch.`}
+          >
+            {streamQuality === 'hd' ? (
+              <>
+                <Zap className="w-3 h-3 text-amber-400" />
+                <span>5G HD</span>
+              </>
+            ) : (
+              <>
+                <Signal className="w-3 h-3 text-emerald-400" />
+                <span>4G Lite</span>
+              </>
+            )}
+          </button>
+
+          <div className="bg-slate-950/85 backdrop-blur-md text-white px-3 py-1.5 rounded-xl border border-white/20 shadow-xl text-left pointer-events-none">
+            <div className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+              <span>{steps[activeStep]?.badge || 'Recynova System'}</span>
+            </div>
+            <p className="text-[11px] sm:text-xs font-bold text-white truncate max-w-[160px] sm:max-w-[200px]">
+              {steps[activeStep]?.title}
+            </p>
           </div>
-          <p className="text-[11px] sm:text-xs font-bold text-white truncate max-w-[160px] sm:max-w-[200px]">
-            {steps[activeStep]?.title}
-          </p>
         </div>
 
         {/* Center Play Overlay when Paused */}

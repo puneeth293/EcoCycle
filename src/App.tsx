@@ -6,6 +6,7 @@ import { Toast } from './components/Toast';
 import { WasteItemModal } from './components/WasteItemModal';
 import { AIAssistantWidget } from './components/AIAssistantWidget';
 import { GlobalBackground } from './components/GlobalBackground';
+import { OfflineIndicator } from './components/OfflineIndicator';
 
 import { HomeView } from './views/HomeView';
 import { SegregationView } from './views/SegregationView';
@@ -55,6 +56,7 @@ const MainContent: React.FC = () => {
       <Toast />
       <WasteItemModal />
       <AIAssistantWidget />
+      <OfflineIndicator />
     </div>
   );
 };

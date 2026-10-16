@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import compression from "compression";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -9,12 +10,43 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+// Gzip & Deflate compression to reduce network transfer sizes across 3G/4G/5G
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers["x-no-compression"]) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  threshold: 1024, // Compress responses above 1KB
+}));
+
 app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
-// Serve static videos
-app.use("/videos", express.static(path.join(process.cwd(), "public/videos")));
-app.use(express.static(path.join(process.cwd(), "public")));
+// Fast video static serving with range-support & caching headers
+app.use("/videos", express.static(path.join(process.cwd(), "public/videos"), {
+  maxAge: "7d",
+  etag: true,
+  lastModified: true,
+  setHeaders: (res) => {
+    res.setHeader("Cache-Control", "public, max-age=604800, stale-while-revalidate=86400");
+    res.setHeader("Accept-Ranges", "bytes");
+  }
+}));
+
+// Public assets serving with cache headers
+app.use(express.static(path.join(process.cwd(), "public"), {
+  maxAge: "1d",
+  etag: true,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith(".html")) {
+      res.setHeader("Cache-Control", "no-cache");
+    } else {
+      res.setHeader("Cache-Control", "public, max-age=86400");
+    }
+  }
+}));
 
 // Initialize Gemini client server-side if key is present
 let aiClient: GoogleGenAI | null = null;
@@ -310,82 +342,98 @@ Return a JSON object with strictly these keys:
   }
 });
 
-// AI Photo Analyzer & Reward Engine endpoint (supports Waste, Air Pollution, Water Pollution, Soil Pollution)
-app.post("/api/analyze-photo", async (req, res) => {
+// Helper to extract base64 data and mimeType from data URL or remote image URL
+async function extractBase64AndMime(imageInput: string): Promise<{ base64Data: string; mimeType: string } | null> {
+  if (!imageInput || typeof imageInput !== "string") return null;
+
+  if (imageInput.startsWith("data:")) {
+    const match = imageInput.match(/^data:([a-zA-Z0-9.+-]+\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+    if (match) {
+      return { mimeType: match[1], base64Data: match[2] };
+    }
+  } else if (imageInput.startsWith("http://") || imageInput.startsWith("https://")) {
+    try {
+      const response = await fetch(imageInput);
+      if (response.ok) {
+        const buffer = await response.arrayBuffer();
+        const mimeType = response.headers.get("content-type") || "image/jpeg";
+        const base64Data = Buffer.from(buffer).toString("base64");
+        return { mimeType, base64Data };
+      }
+    } catch (e) {
+      console.warn("Could not fetch remote image URL:", e);
+    }
+  }
+  return null;
+}
+
+// AI Photo Analyzer & Reward Engine core handler (supports Waste, Air Pollution, Water Pollution, Soil Pollution)
+async function handlePhotoAnalysis(req: express.Request, res: express.Response) {
   try {
-    const { image, notes, itemNameHint, reportCategory = "auto", location } = req.body;
+    const image = req.body.image || req.body.imageData;
+    const notes = req.body.notes || req.body.userNote || "";
+    const itemNameHint = req.body.itemNameHint || req.body.fileName || "";
+    const reportCategory = req.body.reportCategory || req.body.category || "waste";
+    const location = req.body.location || req.body.locationText || "Local municipality";
+
     if (!image || typeof image !== "string") {
       return res.status(400).json({ error: "Image data (base64 string or URL) is required" });
     }
 
     const ai = getAiClient();
+    const imagePayload = await extractBase64AndMime(image);
 
-    // Check if image is base64 data URL
-    const isBase64 = image.startsWith("data:image/");
-    let mimeType = "image/jpeg";
-    let base64Data = image;
-
-    if (isBase64) {
-      const match = image.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-      if (match) {
-        mimeType = match[1];
-        base64Data = match[2];
-      }
-    }
-
-    if (ai && isBase64) {
-      const prompt = `You are EcoCycle's senior AI environmental computer vision inspector and pollution control board analyst.
+    if (ai && imagePayload) {
+      const prompt = `You are Recynova's senior AI environmental computer vision inspector and municipal waste segregation expert.
 Inspect the user's uploaded photograph carefully.
 Selected report category context: "${reportCategory}".
 User notes: "${notes || "None provided"}".
-Hint: "${itemNameHint || "None"}".
+Filename or hint: "${itemNameHint || "None"}".
 Location reported: "${location || "Local municipality"}".
 
-Determine what is in the photo across these 4 domains:
-1. "waste": Solid waste / Recyclable items (PET bottles, food scraps, cardboard, e-waste, lithium batteries, aluminum cans, packaging).
-2. "air-pollution": Smoke plumes, industrial chimney exhausts, stubble/crop burning, toxic vehicular smog, open garbage combustion, dust emissions.
-3. "water-pollution": Chemical effluents in rivers/lakes, plastic clogged waterbodies, toxic foam, industrial sewage runoff, oil sheen.
-4. "soil-pollution": Illegal open garbage dumping grounds, toxic sludge leakage, heavy metal/battery soil contamination, agricultural land plastics.
+TASK:
+1. Examine the visual features in the photograph and identify the EXACT physical item or environmental condition present.
+   - For example: paper sheet, newspaper, cardboard box, plastic water bottle, soft drink bottle, plastic jar, aluminium soda can, food scraps, banana peel, lithium battery, smartphone, electrical wire, cloth, aerosol spray can, chemical bottle, etc.
+   - Or if an environmental incident: factory chimney smoke plume, toxic smog, chemical foam in river/lake, illegal garbage dump on soil.
+2. If it is waste, correctly classify the item into one of the 5 municipal segregation categories:
+   - "Recyclable Waste" or "Dry Waste" (Blue Bin 🔵) -> Clean paper, newspapers, cardboard, clean PET/HDPE plastic bottles, glass bottles, aluminium cans, metal tins.
+   - "Wet Waste" (Green Bin 🟢) -> Biodegradable food scraps, fruit/vegetable peels, leftover food, tea leaves, garden leaves.
+   - "E-Waste" (Yellow Bin 🟡) -> Old mobile phones, chargers, wires, circuits, computer parts, lithium batteries.
+   - "Hazardous Waste" (Red Bin 🔴) -> Paint containers, chemical cleaners, pesticides, expired medicines, broken fluorescent bulbs.
+   - "Sanitary / Inert Waste" (Black Bin ⚫) -> Diapers, hygiene items, sweepings.
+3. If it is pollution:
+   - "Air Pollution" (smoke, smog, garbage burning)
+   - "Water Pollution" (chemical effluents, frothing river, plastic-choked lake)
+   - "Soil Pollution" (dumpsite, toxic leachate on land)
 
-Evaluate:
-- Title of detected item / incident
-- Domain/Category: "waste" | "air-pollution" | "water-pollution" | "soil-pollution"
-- Severity Level: "Low" | "Moderate" | "Severe" | "Hazardous"
-- Source / material breakdown
-- For waste: assign binColor ("Green"|"Blue"|"Red"|"Black"|"Yellow") and binName ("Green Bin 🟢"|"Blue Bin 🔵"|"Red Bin 🔴"|"Black Bin ⚫"|"Yellow Bin 🟡")
-- For air/water/soil pollution: estimate AQI or contamination impact, list 2-4 key pollutants (e.g. PM2.5, SO2, Microplastics, Heavy Metals, Chemical Surfactants), provide citizen protection steps, and generate municipal grievance ticket ID (e.g. "EC-PCB-AIR-9921").
-- Calculate Eco Points to reward the user for reporting or segregating properly (Award 30 to 75 points).
-- Estimate CO2 saved or emission impact.
-- 3 clear actionable steps for the citizen or municipal crew.
-
-Return strictly a JSON object with this schema:
+4. Return strictly a JSON object with this schema:
 {
   "reportType": "waste" | "air-pollution" | "water-pollution" | "soil-pollution",
-  "detectedTitle": string,
-  "categoryOrDomain": string,
-  "binColor": "Green" | "Blue" | "Red" | "Black" | "Yellow",
-  "binName": string,
-  "confidenceScore": number (85-99),
+  "detectedTitle": string (e.g. "Recyclable Office Paper & Documents" or "Crushed PET Plastic Bottle" or "Corrugated Cardboard Box" or "Organic Banana Peel & Food Waste"),
+  "categoryOrDomain": string (e.g. "Recyclable Waste", "Wet Waste", "Dry Waste", "E-Waste", "Hazardous Waste", "Air Pollution", "Water Pollution", "Soil Pollution"),
+  "binColor": "Blue" | "Green" | "Yellow" | "Red" | "Black" (or null if pollution),
+  "binName": "Blue Bin 🔵" | "Green Bin 🟢" | "Yellow Bin 🟡" | "Red Bin 🔴" | "Black Bin ⚫" (or null if pollution),
+  "confidenceScore": number (88-99),
   "severityLevel": "Low" | "Moderate" | "Severe" | "Hazardous",
   "sourceOfPollution": string,
   "aqiImpact": string,
   "contaminantsIdentified": string[],
-  "conditionNotes": string,
-  "actionSteps": string[],
-  "remedialAdvice": string,
-  "pointsAwarded": number (30-75),
+  "conditionNotes": string (1-2 sentences evaluating item state, cleanliness, or pollution density),
+  "actionSteps": string[] (3 clear actionable steps for the citizen),
+  "remedialAdvice": string (1-2 sentences on how this is recycled or mitigated),
+  "pointsAwarded": number (35-75),
   "co2SavedKg": number,
   "ticketId": string,
   "funFact": string
 }`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.7-flash",
+        model: "gemini-3.8-flash",
         contents: [
           {
             inlineData: {
-              data: base64Data,
-              mimeType: mimeType,
+              data: imagePayload.base64Data,
+              mimeType: imagePayload.mimeType,
             },
           },
           prompt,
@@ -397,28 +445,40 @@ Return strictly a JSON object with this schema:
 
       const jsonText = response.text ? response.text.trim() : "";
       if (jsonText) {
-        const parsed = JSON.parse(jsonText);
-        return res.json({ ...parsed, source: "gemini-vision" });
+        try {
+          const parsed = JSON.parse(jsonText);
+          return res.json({ ...parsed, source: "gemini-vision" });
+        } catch (e) {
+          console.warn("JSON parse error from vision output, using fallback:", e);
+        }
       }
     }
 
     // Fallback computer-vision heuristic analysis
-    const fallbackResult = generateFallbackMultiDomainAnalysis(itemNameHint || notes || "", reportCategory);
+    const hintCombined = `${itemNameHint} ${notes} ${image.length < 500 ? image : ""}`;
+    const fallbackResult = generateFallbackMultiDomainAnalysis(hintCombined, reportCategory);
     return res.json({ ...fallbackResult, source: "vision-heuristic" });
 
   } catch (error: any) {
     console.error("Error analyzing photo with Gemini:", error);
-    const fallbackResult = generateFallbackMultiDomainAnalysis(req.body.itemNameHint || req.body.notes || "", req.body.reportCategory || "waste");
+    const fallbackResult = generateFallbackMultiDomainAnalysis(
+      `${req.body.itemNameHint || req.body.fileName || ""} ${req.body.notes || req.body.userNote || ""}`,
+      req.body.reportCategory || req.body.category || "waste"
+    );
     return res.json({ ...fallbackResult, source: "vision-fallback" });
   }
-});
+}
+
+// Support both endpoint URLs
+app.post("/api/analyze-photo", handlePhotoAnalysis);
+app.post("/api/scan-environmental-photo", handlePhotoAnalysis);
 
 function generateFallbackMultiDomainAnalysis(queryHint: string, reportCategory: string) {
   const q = queryHint.toLowerCase();
   const randTicket = `EC-PCB-${Math.floor(10000 + Math.random() * 90000)}`;
 
-  // Air Pollution Detection
-  if (reportCategory === "air-pollution" || q.includes("smoke") || q.includes("chimney") || q.includes("air") || q.includes("smog") || q.includes("burning") || q.includes("exhaust")) {
+  // Explicit Pollution Modes (when user is on Air, Water, or Soil tab)
+  if (reportCategory === "air-pollution" || (reportCategory !== "waste" && (q.includes("smoke") || q.includes("chimney") || q.includes("smog") || q.includes("exhaust")))) {
     return {
       reportType: "air-pollution",
       detectedTitle: "Industrial Chimney & High-Density Smoke Emissions",
@@ -442,8 +502,8 @@ function generateFallbackMultiDomainAnalysis(queryHint: string, reportCategory: 
     };
   }
 
-  // Water Pollution Detection
-  if (reportCategory === "water-pollution" || q.includes("water") || q.includes("river") || q.includes("lake") || q.includes("foam") || q.includes("effluent") || q.includes("sewage") || q.includes("drain")) {
+  // Water Pollution Detection (Only when on water-pollution category or explicitly reporting river/foam/effluent)
+  if (reportCategory === "water-pollution" || (reportCategory !== "waste" && (q.includes("river pollution") || q.includes("lake foam") || q.includes("effluent") || q.includes("chemical froth") || q.includes("sewage runoff")))) {
     return {
       reportType: "water-pollution",
       detectedTitle: "Untreated Effluent Discharge & Surface Water Contamination",
@@ -468,7 +528,7 @@ function generateFallbackMultiDomainAnalysis(queryHint: string, reportCategory: 
   }
 
   // Soil Pollution Detection
-  if (reportCategory === "soil-pollution" || q.includes("soil") || q.includes("land") || q.includes("dump") || q.includes("ground") || q.includes("sludge") || q.includes("chemical spill")) {
+  if (reportCategory === "soil-pollution" || (reportCategory !== "waste" && (q.includes("dumpsite") || q.includes("landfill") || q.includes("toxic sludge") || q.includes("soil contamination")))) {
     return {
       reportType: "soil-pollution",
       detectedTitle: "Illegal Open Dumpsite & Leachate Soil Contamination",
@@ -489,6 +549,111 @@ function generateFallbackMultiDomainAnalysis(queryHint: string, reportCategory: 
       co2SavedKg: 1.40,
       ticketId: `SPCB-SOL-${Math.floor(10000 + Math.random() * 90000)}`,
       funFact: "Healthy soil stores more carbon than the entire atmosphere and all global plant life combined!"
+    };
+  }
+
+  // Paper & Cardboard Detection
+  if (q.includes("paper") || q.includes("cardboard") || q.includes("box") || q.includes("carton") || q.includes("news") || q.includes("book") || q.includes("sheet") || q.includes("document") || q.includes("envelope") || q.includes("notebook")) {
+    const isCardboard = q.includes("cardboard") || q.includes("box") || q.includes("carton");
+    return {
+      reportType: "waste",
+      detectedTitle: isCardboard ? "Corrugated Cardboard Packaging Box" : "Recyclable Office Paper & Documents",
+      categoryOrDomain: "Recyclable Waste",
+      binColor: "Blue",
+      binName: "Blue Bin 🔵",
+      confidenceScore: 98,
+      severityLevel: "Low",
+      sourceOfPollution: "Clean wood-pulp cellulose fibers",
+      contaminantsIdentified: ["100% Recyclable Cellulose Paper / Cardboard"],
+      conditionNotes: "Dry, clean, non-greasy recyclable paper fibers suitable for pulp re-manufacturing.",
+      actionSteps: [
+        "Ensure paper is completely dry and free from oil or grease contamination.",
+        "Flatten boxes and bundle papers together neatly to optimize transport.",
+        "Deposit in the dry recyclables Blue Bin for doorstep pickup."
+      ],
+      remedialAdvice: "Recycling 1 ton of paper saves 17 mature trees, 7,000 gallons of water, and 4,000 kWh of clean electricity.",
+      pointsAwarded: 40,
+      co2SavedKg: 0.85,
+      ticketId: randTicket,
+      funFact: "Paper fibers can be recycled into new notebooks and packaging up to 7 times before degrading!"
+    };
+  }
+
+  // Plastic Bottles & Containers
+  if (q.includes("bottle") || q.includes("pet") || q.includes("water") || q.includes("soda") || q.includes("plastic") || q.includes("jug") || q.includes("container") || q.includes("shampoo")) {
+    return {
+      reportType: "waste",
+      detectedTitle: "PET Plastic Water & Beverage Bottle",
+      categoryOrDomain: "Recyclable Waste",
+      binColor: "Blue",
+      binName: "Blue Bin 🔵",
+      confidenceScore: 98,
+      severityLevel: "Low",
+      sourceOfPollution: "Polyethylene Terephthalate polymer (Resin #1)",
+      contaminantsIdentified: ["Recyclable thermoplastic PET plastic"],
+      conditionNotes: "Clear, clean plastic beverage container. Empty and ready for mechanical processing.",
+      actionSteps: [
+        "Rinse out any residual liquid with a quick splash of water.",
+        "Unscrew cap and crush the bottle body flat to reduce volume.",
+        "Deposit in the dry recyclables Blue Bin."
+      ],
+      remedialAdvice: "Recycled PET bottles are shredded into clean flakes and spun into high-tensile polyester yarns for eco-clothing and textiles.",
+      pointsAwarded: 40,
+      co2SavedKg: 0.65,
+      ticketId: randTicket,
+      funFact: "It takes just 5 recycled plastic bottles to create enough polyester fiber for a new athletic T-shirt!"
+    };
+  }
+
+  // Glass Jars & Bottles
+  if (q.includes("glass") || q.includes("jar") || q.includes("wine") || q.includes("beer")) {
+    return {
+      reportType: "waste",
+      detectedTitle: "Recyclable Glass Bottle & Container",
+      categoryOrDomain: "Recyclable Waste",
+      binColor: "Blue",
+      binName: "Blue Bin 🔵",
+      confidenceScore: 99,
+      severityLevel: "Low",
+      sourceOfPollution: "Silica-based container glass",
+      contaminantsIdentified: ["100% Endlessly Recyclable Glass"],
+      conditionNotes: "Intact clean glass container, non-broken, free from chemical residues.",
+      actionSteps: [
+        "Rinse clean to remove food or liquid residues.",
+        "Remove metal lids or corks and place them separately.",
+        "Place gently in the dry recyclables Blue Bin without shattering."
+      ],
+      remedialAdvice: "Glass is 100% recyclable and can be melted down and re-molded infinitely with zero loss in purity.",
+      pointsAwarded: 45,
+      co2SavedKg: 0.50,
+      ticketId: randTicket,
+      funFact: "A glass bottle can take over 4,000 years to decompose in a landfill, but takes only 30 days to become a new bottle when recycled!"
+    };
+  }
+
+  // Domestic Hazardous Waste
+  if (q.includes("chemical") || q.includes("paint") || q.includes("medicine") || q.includes("spray") || q.includes("pesticide") || q.includes("aerosol") || q.includes("hazardous") || q.includes("solvent")) {
+    return {
+      reportType: "waste",
+      detectedTitle: "Domestic Hazardous Waste / Chemical Container",
+      categoryOrDomain: "Hazardous Waste",
+      binColor: "Red",
+      binName: "Red Bin 🔴",
+      confidenceScore: 97,
+      severityLevel: "Hazardous",
+      sourceOfPollution: "Toxic chemical or hazardous solvent packaging",
+      contaminantsIdentified: ["Chemical toxins", "Flammable propellant", "Heavy metals"],
+      conditionNotes: "Hazardous packaging requires isolated containment to prevent environmental contamination.",
+      actionSteps: [
+        "Do not pour residual chemicals down municipal drains or sinks.",
+        "Keep in original container with tightly sealed lid.",
+        "Deposit in the Red Hazardous Waste Bin or deliver to authorized municipal hazardous collection center."
+      ],
+      remedialAdvice: "Hazardous waste is neutralized through high-temperature incineration or stabilization in specialized secure landfills.",
+      pointsAwarded: 50,
+      co2SavedKg: 1.20,
+      ticketId: randTicket,
+      funFact: "Proper hazardous waste disposal prevents toxic chemicals from leaching into municipal groundwater aquifers!"
     };
   }
 
@@ -568,28 +733,28 @@ function generateFallbackMultiDomainAnalysis(queryHint: string, reportCategory: 
     };
   }
 
-  // Default clean recyclable plastic container
+  // Default clean recyclable plastic / dry waste item
   return {
     reportType: "waste",
-    detectedTitle: "PET Recyclable Polymer Container",
+    detectedTitle: "Recyclable Packaging & Polymer Item",
     categoryOrDomain: "Recyclable Waste",
     binColor: "Blue",
     binName: "Blue Bin 🔵",
     confidenceScore: 95,
     severityLevel: "Low",
-    sourceOfPollution: "Polyethylene Terephthalate resin (#1)",
-    contaminantsIdentified: ["Thermoplastic PET polymer"],
-    conditionNotes: "Clean, transparent thermoplastic polymer identified with SPI Resin Code #1.",
+    sourceOfPollution: "Recyclable municipal solid waste material",
+    contaminantsIdentified: ["Clean recyclable packaging material"],
+    conditionNotes: "Clean, dry recyclable material identified. Segregated properly for municipal recovery.",
     actionSteps: [
-      "Empty residual liquid and rinse container.",
-      "Remove label cap ring and compress the bottle flat.",
-      "Place in the dry recyclables blue bin for mechanical re-granulation."
+      "Ensure item is rinsed and free from perishable residues.",
+      "Flatten or compact before disposal to save bin capacity.",
+      "Deposit in the dry recyclables Blue Bin for processing."
     ],
-    remedialAdvice: "Mechanical recycling melts PET flakes into high-tensile polyester fibers used in eco-clothing and textiles.",
+    remedialAdvice: "Proper segregation at source keeps 90% of dry recyclable materials out of municipal landfills.",
     pointsAwarded: 40,
     co2SavedKg: 0.65,
     ticketId: randTicket,
-    funFact: "It takes just 5 recycled plastic bottles to create enough polyester fiber for a new athletic T-shirt!"
+    funFact: "Every ton of segregated recyclables diverts over 3 cubic yards of waste from overflowing dumpsites!"
   };
 }
 

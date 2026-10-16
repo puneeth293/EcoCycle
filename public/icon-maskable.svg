@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#063B32" />
+      <stop offset="100%" stop-color="#03251F" />
+    </linearGradient>
+    <filter id="glow-m" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#10B981" flood-opacity="0.4" />
+    </filter>
+  </defs>
+  
+  <!-- Full bleed background for maskable icon -->
+  <rect width="512" height="512" fill="url(#bg-grad)" />
+  
+  <!-- Safe Zone Central Area (within 80% circle) -->
+  <g transform="translate(256, 235) scale(0.88)">
+    <circle cx="0" cy="0" r="170" fill="#044339" opacity="0.6" stroke="#10B981" stroke-width="4" stroke-dasharray="12 10" />
+
+    <g filter="url(#glow-m)" transform="scale(0.95)">
+      <!-- Arrow 1 -->
+      <path d="M -45 -95 L 10 -95 C 50 -95 82 -65 85 -25 L 102 -32 L 95 10 L 50 2 L 67 -8 C 65 -32 40 -58 10 -58 L -45 -58 L -32 -76 Z" fill="#34D399" />
+      
+      <!-- Arrow 2 -->
+      <path d="M 80 18 L 54 65 C 34 98 -4 116 -45 108 L -40 128 L -80 102 L -58 62 L -54 82 C -22 88 8 76 26 50 L 52 4 L 64 22 Z" fill="#10B981" />
+
+      <!-- Arrow 3 -->
+      <path d="M -36 76 L -62 30 C -82 -4 -72 -46 -40 -72 L -55 -82 L -14 -85 L -18 -42 L -34 -54 C -54 -36 -62 -4 -45 25 L -18 72 Z" fill="#059669" />
+      
+      <!-- Center Leaf -->
+      <path d="M 0 25 C -22 0 -18 -30 0 -48 C 18 -30 22 0 0 25 Z" fill="#6EE7B7" />
+    </g>
+
+    <text x="0" y="145" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="28" letter-spacing="3" fill="#A7F3D0">RECYNOVA</text>
+  </g>
+</svg>

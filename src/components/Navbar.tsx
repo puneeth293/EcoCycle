@@ -21,6 +21,8 @@ import {
   Edit2,
   Check
 } from 'lucide-react';
+import { NetworkStatusBadge } from './NetworkStatusBadge';
+import { PWAInstallButton } from './PWAInstallButton';
 
 export const Navbar: React.FC = () => {
   const { currentPage, navigate, user, logoutUser, updateUserName } = useApp();
@@ -112,7 +114,10 @@ export const Navbar: React.FC = () => {
           </nav>
 
           {/* Right Action / User Profile */}
-          <div className="hidden lg:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-2.5">
+            <NetworkStatusBadge />
+            <PWAInstallButton />
+
             {user ? (
               <div className="relative">
                 <button
@@ -263,9 +268,11 @@ export const Navbar: React.FC = () => {
           </div>
 
           {/* Mobile Hamburger Button */}
-          <div className="flex lg:hidden items-center gap-2">
+          <div className="flex lg:hidden items-center gap-1.5">
+            <NetworkStatusBadge compact />
+            <PWAInstallButton compact />
             {user && (
-              <div className="flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-xl text-xs font-bold text-emerald-800 border border-emerald-200">
+              <div className="flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-xl text-xs font-bold text-emerald-800 border border-emerald-200">
                 <Award className="w-3.5 h-3.5 text-amber-500" />
                 <span>{user.ecoPoints}</span>
               </div>
