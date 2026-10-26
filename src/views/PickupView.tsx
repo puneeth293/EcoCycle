@@ -9,6 +9,7 @@ import {
   Search,
   Database
 } from 'lucide-react';
+import { SupabaseSyncBanner } from '../components/SupabaseSyncBanner';
 
 export const PickupView: React.FC = () => {
   const { user, pickupRequests, addPickupRequest } = useApp();
@@ -178,6 +179,11 @@ export const PickupView: React.FC = () => {
               ⚠️ Request ID not found. Please verify the ID or check your user dashboard list.
             </p>
           )}
+        </div>
+
+        {/* Supabase Realtime Storage & Tables Status Banner */}
+        <div className="max-w-4xl mx-auto">
+          <SupabaseSyncBanner pageType="pickup" />
         </div>
 
         {/* Confirmation Card after Submission */}

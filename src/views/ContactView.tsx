@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ContactLocationDetailsCard } from '../components/ContactLocationDetailsCard';
+import { SupabaseSyncBanner } from '../components/SupabaseSyncBanner';
 
 export const ContactView: React.FC = () => {
   const { addContactMessage } = useApp();
@@ -82,6 +83,9 @@ export const ContactView: React.FC = () => {
             Have questions about collection schedules, corporate bulk waste handling, or partnership opportunities? Reach out to our team.
           </p>
         </div>
+
+        {/* Supabase Storage & Tables Status Banner */}
+        <SupabaseSyncBanner pageType="contact" />
 
         {/* Contact Info + Form Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">

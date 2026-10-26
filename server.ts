@@ -1039,35 +1039,54 @@ app.get("/api/electricity/transactions", (_req, res) => {
 // ==========================================
 // SUPABASE-INTEGRATED PICKUP REQUESTS API
 // ==========================================
+const PICKUP_TABLE_CANDIDATES = [
+  'pickup_requests',
+  'pickuprequests',
+  'pickup_request',
+  'pickuprequest',
+  'pickups',
+  'pickup'
+];
+
+const CONTACT_TABLE_CANDIDATES = [
+  'contact_messages',
+  'contactmessages',
+  'contact_message',
+  'contactmessage',
+  'contacts',
+  'contact'
+];
+
 app.get("/api/pickups", async (_req, res) => {
   if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from('pickup_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
+    for (const tableName of PICKUP_TABLE_CANDIDATES) {
+      try {
+        const { data, error } = await supabase
+          .from(tableName)
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
-        // Map database columns to app format
-        const mapped = data.map((row: any) => ({
-          id: row.id,
-          userName: row.user_name || row.userName || 'Resident',
-          userEmail: row.user_email || row.userEmail || '',
-          userPhone: row.user_phone || row.userPhone || '',
-          address: row.address || '',
-          city: row.city || '',
-          wasteType: row.waste_type || row.wasteType || 'Recyclable Waste',
-          quantity: row.quantity || '',
-          preferredDate: row.preferred_date || row.preferredDate || '',
-          preferredTime: row.preferred_time || row.preferredTime || '',
-          notes: row.notes || '',
-          status: row.status || 'Pending',
-          createdAt: row.created_at || row.createdAt || new Date().toISOString()
-        }));
-        return res.json(mapped);
+        if (!error && data && data.length > 0) {
+          const mapped = data.map((row: any) => ({
+            id: row.id,
+            userName: row.user_name || row.userName || 'Resident',
+            userEmail: row.user_email || row.userEmail || '',
+            userPhone: row.user_phone || row.userPhone || '',
+            address: row.address || '',
+            city: row.city || '',
+            wasteType: row.waste_type || row.wasteType || 'Recyclable Waste',
+            quantity: row.quantity || '',
+            preferredDate: row.preferred_date || row.preferredDate || '',
+            preferredTime: row.preferred_time || row.preferredTime || '',
+            notes: row.notes || '',
+            status: row.status || 'Pending',
+            createdAt: row.created_at || row.createdAt || new Date().toISOString()
+          }));
+          return res.json(mapped);
+        }
+      } catch (err) {
+        console.warn(`[Supabase] GET /api/pickups check on '${tableName}':`, err);
       }
-    } catch (err) {
-      console.warn("[Supabase] GET /api/pickups query note:", err);
     }
   }
   res.json(pickupRequests);
@@ -1086,55 +1105,82 @@ app.post("/api/pickups", async (req, res) => {
   // 1. Keep in memory for instant local availability
   pickupRequests.unshift(fullRecord);
 
-  // 2. Persist to Supabase pickup_requests table
+  // 2. Persist to Supabase pickup table
+  let supabaseSaved = false;
+  let savedTable: string | null = null;
+  let supabaseError: string | null = null;
+
   if (supabase) {
-    try {
-      const snakePayload = {
-        id: fullRecord.id,
-        user_name: fullRecord.userName || '',
-        user_email: fullRecord.userEmail || '',
-        user_phone: fullRecord.userPhone || '',
-        address: fullRecord.address || '',
-        city: fullRecord.city || '',
-        waste_type: fullRecord.wasteType || 'Recyclable Waste',
-        quantity: fullRecord.quantity || '',
-        preferred_date: fullRecord.preferredDate || '',
-        preferred_time: fullRecord.preferredTime || '',
-        notes: fullRecord.notes || '',
-        status: fullRecord.status || 'Pending',
-        created_at: fullRecord.createdAt
-      };
+    const snakePayload = {
+      id: fullRecord.id,
+      user_name: fullRecord.userName || '',
+      user_email: fullRecord.userEmail || '',
+      user_phone: fullRecord.userPhone || '',
+      address: fullRecord.address || '',
+      city: fullRecord.city || '',
+      waste_type: fullRecord.wasteType || 'Recyclable Waste',
+      quantity: fullRecord.quantity || '',
+      preferred_date: fullRecord.preferredDate || '',
+      preferred_time: fullRecord.preferredTime || '',
+      notes: fullRecord.notes || '',
+      status: fullRecord.status || 'Pending',
+      created_at: fullRecord.createdAt
+    };
 
-      const { error: snakeErr } = await supabase
-        .from('pickup_requests')
-        .upsert(snakePayload, { onConflict: 'id' });
+    const camelPayload = {
+      id: fullRecord.id,
+      userName: fullRecord.userName,
+      userEmail: fullRecord.userEmail,
+      userPhone: fullRecord.userPhone,
+      address: fullRecord.address,
+      city: fullRecord.city,
+      wasteType: fullRecord.wasteType,
+      quantity: fullRecord.quantity,
+      preferredDate: fullRecord.preferredDate,
+      preferredTime: fullRecord.preferredTime,
+      notes: fullRecord.notes || '',
+      status: fullRecord.status || 'Pending',
+      createdAt: fullRecord.createdAt
+    };
 
-      if (snakeErr && snakeErr.code !== 'PGRST205') {
-        // Retry with camelCase in case table was created with camelCase
-        await supabase
-          .from('pickup_requests')
-          .upsert({
-            id: fullRecord.id,
-            userName: fullRecord.userName,
-            userEmail: fullRecord.userEmail,
-            userPhone: fullRecord.userPhone,
-            address: fullRecord.address,
-            city: fullRecord.city,
-            wasteType: fullRecord.wasteType,
-            quantity: fullRecord.quantity,
-            preferredDate: fullRecord.preferredDate,
-            preferredTime: fullRecord.preferredTime,
-            notes: fullRecord.notes || '',
-            status: fullRecord.status || 'Pending',
-            createdAt: fullRecord.createdAt
-          }, { onConflict: 'id' });
+    for (const tableName of PICKUP_TABLE_CANDIDATES) {
+      try {
+        const { error: snakeErr } = await supabase
+          .from(tableName)
+          .upsert(snakePayload, { onConflict: 'id' });
+
+        if (!snakeErr) {
+          supabaseSaved = true;
+          savedTable = tableName;
+          break;
+        }
+
+        if (snakeErr.code !== 'PGRST205') {
+          const { error: camelErr } = await supabase
+            .from(tableName)
+            .upsert(camelPayload, { onConflict: 'id' });
+
+          if (!camelErr) {
+            supabaseSaved = true;
+            savedTable = tableName;
+            break;
+          }
+          supabaseError = camelErr.message;
+        } else {
+          supabaseError = snakeErr.message;
+        }
+      } catch (err: any) {
+        supabaseError = err?.message;
       }
-    } catch (err) {
-      console.warn("[Supabase] Insert pickup notice:", err);
     }
   }
 
-  res.status(201).json(fullRecord);
+  res.status(201).json({
+    ...fullRecord,
+    supabaseSaved,
+    savedTable,
+    supabaseError: supabaseSaved ? null : (supabaseError || "Table 'pickup_requests' not created in Supabase project yet")
+  });
 });
 
 app.put("/api/pickups/:id/status", async (req, res) => {
@@ -1146,10 +1192,11 @@ app.put("/api/pickups/:id/status", async (req, res) => {
   }
 
   if (supabase) {
-    try {
-      await supabase.from('pickup_requests').update({ status }).eq('id', id);
-    } catch (err) {
-      console.warn("[Supabase] Status update notice:", err);
+    for (const tableName of PICKUP_TABLE_CANDIDATES) {
+      try {
+        const { error } = await supabase.from(tableName).update({ status }).eq('id', id);
+        if (!error) break;
+      } catch {}
     }
   }
 
@@ -1164,25 +1211,25 @@ app.put("/api/pickups/:id/status", async (req, res) => {
 // ==========================================
 app.get("/api/contacts", async (_req, res) => {
   if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from('contact_messages')
-        .select('*')
-        .order('created_at', { ascending: false });
+    for (const tableName of CONTACT_TABLE_CANDIDATES) {
+      try {
+        const { data, error } = await supabase
+          .from(tableName)
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
-        return res.json(data.map((r: any) => ({
-          id: r.id,
-          name: r.name,
-          email: r.email,
-          subject: r.subject || '',
-          message: r.message,
-          status: r.status || 'New',
-          createdAt: r.created_at || r.createdAt || new Date().toISOString()
-        })));
-      }
-    } catch (err) {
-      console.warn("[Supabase] GET /api/contacts notice:", err);
+        if (!error && data && data.length > 0) {
+          return res.json(data.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            email: r.email,
+            subject: r.subject || '',
+            message: r.message,
+            status: r.status || 'New',
+            createdAt: r.created_at || r.createdAt || new Date().toISOString()
+          })));
+        }
+      } catch {}
     }
   }
   res.json(contactMessages);
@@ -1206,32 +1253,115 @@ app.post("/api/contacts", async (req, res) => {
 
   contactMessages.unshift(contactRecord);
 
-  if (supabase) {
-    try {
-      const { error } = await supabase.from('contact_messages').upsert({
-        id: contactRecord.id,
-        name: contactRecord.name,
-        email: contactRecord.email,
-        subject: contactRecord.subject,
-        message: contactRecord.message,
-        status: contactRecord.status,
-        created_at: contactRecord.createdAt
-      }, { onConflict: 'id' });
+  let supabaseSaved = false;
+  let savedTable: string | null = null;
+  let supabaseError: string | null = null;
 
-      if (error) {
-        console.warn("[Supabase] contact_messages notice:", error.message);
-      } else {
-        console.log(`[Supabase] Contact message saved to contact_messages: ${contactRecord.id}`);
+  if (supabase) {
+    for (const tableName of CONTACT_TABLE_CANDIDATES) {
+      try {
+        const { error } = await supabase.from(tableName).upsert({
+          id: contactRecord.id,
+          name: contactRecord.name,
+          email: contactRecord.email,
+          subject: contactRecord.subject,
+          message: contactRecord.message,
+          status: contactRecord.status,
+          created_at: contactRecord.createdAt
+        }, { onConflict: 'id' });
+
+        if (!error) {
+          supabaseSaved = true;
+          savedTable = tableName;
+          console.log(`[Supabase] Contact saved to '${tableName}': ${contactRecord.id}`);
+          break;
+        } else {
+          supabaseError = error.message;
+        }
+      } catch (err: any) {
+        supabaseError = err?.message;
       }
-    } catch (err) {
-      console.warn("[Supabase] Exception inserting contact:", err);
     }
   }
 
   res.status(201).json({
     success: true,
-    message: "Contact message saved to Supabase database successfully!",
-    record: contactRecord
+    message: supabaseSaved 
+      ? `Contact message saved to Supabase table '${savedTable}'!` 
+      : "Message saved locally. Create 'contact_messages' table in Supabase to sync.",
+    record: contactRecord,
+    supabaseSaved,
+    savedTable,
+    supabaseError: supabaseSaved ? null : (supabaseError || "Table 'contact_messages' not found in Supabase")
+  });
+});
+
+// Bulk sync endpoint to sync all local data to Supabase once tables are created
+app.post("/api/supabase/sync-all", async (req, res) => {
+  const { pickups = [], contacts = [] } = req.body;
+  let syncedPickups = 0;
+  let syncedContacts = 0;
+  let pickupError: string | null = null;
+  let contactError: string | null = null;
+
+  if (supabase) {
+    // 1. Sync pickups
+    for (const p of pickups) {
+      for (const tableName of PICKUP_TABLE_CANDIDATES) {
+        const { error } = await supabase.from(tableName).upsert({
+          id: p.id,
+          user_name: p.userName,
+          user_email: p.userEmail,
+          user_phone: p.userPhone,
+          address: p.address,
+          city: p.city,
+          waste_type: p.wasteType,
+          quantity: p.quantity,
+          preferred_date: p.preferredDate,
+          preferred_time: p.preferredTime,
+          notes: p.notes || '',
+          status: p.status || 'Pending',
+          created_at: p.createdAt || new Date().toISOString()
+        }, { onConflict: 'id' });
+
+        if (!error) {
+          syncedPickups++;
+          break;
+        } else {
+          pickupError = error.message;
+        }
+      }
+    }
+
+    // 2. Sync contacts
+    for (const c of contacts) {
+      for (const tableName of CONTACT_TABLE_CANDIDATES) {
+        const { error } = await supabase.from(tableName).upsert({
+          id: c.id,
+          name: c.name,
+          email: c.email,
+          subject: c.subject || '',
+          message: c.message,
+          status: c.status || 'New',
+          created_at: c.createdAt || new Date().toISOString()
+        }, { onConflict: 'id' });
+
+        if (!error) {
+          syncedContacts++;
+          break;
+        } else {
+          contactError = error.message;
+        }
+      }
+    }
+  }
+
+  res.json({
+    success: syncedPickups > 0 || syncedContacts > 0,
+    syncedPickups,
+    syncedContacts,
+    pickupError,
+    contactError
   });
 });
 
@@ -1241,17 +1371,34 @@ app.post("/api/contacts", async (req, res) => {
 app.get("/api/supabase/status", async (_req, res) => {
   let connected = false;
   let pickupTableReady = false;
+  let activePickupTable: string | null = null;
   let contactTableReady = false;
+  let activeContactTable: string | null = null;
   let errorMsg = null;
 
   if (supabase) {
     try {
-      const { error: pErr } = await supabase.from('pickup_requests').select('id').limit(1);
       connected = true;
-      if (!pErr) pickupTableReady = true;
 
-      const { error: cErr } = await supabase.from('contact_messages').select('id').limit(1);
-      if (!cErr) contactTableReady = true;
+      // Check pickups across candidates
+      for (const table of PICKUP_TABLE_CANDIDATES) {
+        const { error } = await supabase.from(table).select('id').limit(1);
+        if (!error) {
+          pickupTableReady = true;
+          activePickupTable = table;
+          break;
+        }
+      }
+
+      // Check contacts across candidates
+      for (const table of CONTACT_TABLE_CANDIDATES) {
+        const { error } = await supabase.from(table).select('id').limit(1);
+        if (!error) {
+          contactTableReady = true;
+          activeContactTable = table;
+          break;
+        }
+      }
     } catch (e: any) {
       errorMsg = e?.message;
     }
@@ -1262,9 +1409,12 @@ app.get("/api/supabase/status", async (_req, res) => {
     url: SUPABASE_URL,
     connected,
     pickupTableReady,
+    activePickupTable,
     contactTableReady,
+    activeContactTable,
     error: errorMsg,
-    sqlSetupUrl: `https://supabase.com/dashboard/project/${SUPABASE_PROJECT_ID}/sql`
+    sqlSetupUrl: `https://supabase.com/dashboard/project/${SUPABASE_PROJECT_ID}/sql/new`,
+    tableEditorUrl: `https://supabase.com/dashboard/project/${SUPABASE_PROJECT_ID}/editor`
   });
 });
 
