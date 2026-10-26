@@ -6,7 +6,8 @@ import {
   User, 
   Package, 
   CheckCircle2, 
-  Search
+  Search,
+  Database
 } from 'lucide-react';
 
 export const PickupView: React.FC = () => {
@@ -242,11 +243,15 @@ export const PickupView: React.FC = () => {
             
             <form onSubmit={handleSubmit} className="space-y-6">
               
-              <div className="border-b border-emerald-100 pb-4">
+              <div className="border-b border-emerald-100 pb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <h3 className="text-lg font-black text-[#063B32] flex items-center gap-2">
                   <User className="w-5 h-5 text-emerald-600" />
                   <span>Contact & Location Details</span>
                 </h3>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-[10px] font-bold text-emerald-800 shadow-2xs">
+                  <Database className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Supabase Live Sync (Project: zkuongbbsshtpsasdbun)</span>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -411,14 +416,17 @@ export const PickupView: React.FC = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm shadow-xl transition-all flex items-center justify-center gap-2 shadow-emerald-600/25"
+                  className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-black text-sm shadow-xl transition-all flex items-center justify-center gap-2 shadow-emerald-600/25 cursor-pointer"
                 >
                   {submitting ? (
-                    <span>Submitting Request...</span>
+                    <span className="flex items-center gap-2">
+                      <Truck className="w-5 h-5 animate-bounce" />
+                      <span>Saving Pickup Details to Supabase Database...</span>
+                    </span>
                   ) : (
                     <>
                       <Truck className="w-5 h-5" />
-                      <span>Request Waste Pickup (+30 Eco Points)</span>
+                      <span>Schedule Pickup & Save to Supabase (+30 Eco Points)</span>
                     </>
                   )}
                 </button>

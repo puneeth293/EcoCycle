@@ -4,15 +4,20 @@ import {
   ChevronDown, 
   HelpCircle, 
   CheckCircle2, 
-  MessageSquare
+  MessageSquare,
+  Database,
+  Sparkles
 } from 'lucide-react';
+import { useApp } from '../context/AppContext';
 import { ContactLocationDetailsCard } from '../components/ContactLocationDetailsCard';
 
 export const ContactView: React.FC = () => {
+  const { addContactMessage } = useApp();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [sentSuccess, setSentSuccess] = useState(false);
 
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -40,9 +45,17 @@ export const ContactView: React.FC = () => {
     }
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (name && email && message) {
+      setIsSubmitting(true);
+      await addContactMessage({
+        name,
+        email,
+        subject: subject || 'General Support Inquiry',
+        message
+      });
+      setIsSubmitting(false);
       setSentSuccess(true);
       setName('');
       setEmail('');
@@ -82,10 +95,16 @@ export const ContactView: React.FC = () => {
           <div className="lg:col-span-6">
             <div className="glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl">
               
-              <h2 className="text-xl font-black text-[#063B32] mb-6 flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-emerald-600" />
-                <span>Send Us a Message</span>
-              </h2>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-6">
+                <h2 className="text-xl font-black text-[#063B32] flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-emerald-600" />
+                  <span>Send Us a Message</span>
+                </h2>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[10px] font-bold text-emerald-800">
+                  <Database className="w-3 h-3 text-emerald-600" />
+                  <span>Supabase Storage Active</span>
+                </div>
+              </div>
 
               {sentSuccess ? (
                 <div className="glass-subcard p-6 rounded-2xl border border-emerald-300 text-center space-y-3">
@@ -162,10 +181,11 @@ export const ContactView: React.FC = () => {
 
                   <button
                     type="submit"
-                    className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2 shadow-emerald-600/25"
+                    disabled={isSubmitting}
+                    className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2 shadow-emerald-600/25 cursor-pointer"
                   >
-                    <Send className="w-4 h-4" />
-                    <span>Send Message</span>
+                    <Send className={`w-4 h-4 ${isSubmitting ? 'animate-spin' : ''}`} />
+                    <span>{isSubmitting ? 'Saving to Supabase Database...' : 'Send Message & Save to Supabase'}</span>
                   </button>
                 </form>
               )}

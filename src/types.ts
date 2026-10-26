@@ -72,6 +72,16 @@ export interface PickupRequest {
   createdAt: string;
 }
 
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  subject?: string;
+  message: string;
+  status?: string;
+  createdAt: string;
+}
+
 export interface CollectionCenter {
   id: string;
   name: string;

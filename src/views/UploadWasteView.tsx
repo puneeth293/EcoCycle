@@ -485,6 +485,9 @@ export const UploadWasteView: React.FC = () => {
     setUserNote('');
     setUploadedFileName('');
     setActiveMaterial(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     stopCamera();
   };
 
@@ -871,13 +874,36 @@ export const UploadWasteView: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Uploaded File Indicator */}
-                  {uploadedFileName && (
-                    <div className="flex items-center justify-between bg-emerald-50/80 px-3 py-1.5 rounded-xl border border-emerald-200 text-xs font-bold text-emerald-900">
-                      <span className="truncate">📁 Image: {uploadedFileName}</span>
-                      <span className="text-[10px] uppercase font-black tracking-wider text-emerald-700 bg-white px-2 py-0.5 rounded-md shadow-2xs">
-                        Ready to scan
-                      </span>
+                  {/* Photo Actions Bar: Clear, Delete Photo & Change Photo */}
+                  {!isScanning && (
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200 shadow-2xs">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-800 truncate">
+                        <span className="truncate">
+                          {uploadedFileName ? `📁 ${uploadedFileName}` : '📸 Selected Photo Ready'}
+                        </span>
+                        <span className="text-[10px] uppercase font-black tracking-wider text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md shadow-2xs shrink-0">
+                          Ready to scan
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 justify-end">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Change Photo</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={resetScanner}
+                          title="Delete this photo"
+                          className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete Photo</span>
+                        </button>
+                      </div>
                     </div>
                   )}
 

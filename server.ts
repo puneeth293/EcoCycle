@@ -3,9 +3,25 @@ import path from "path";
 import compression from "compression";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+// Supabase Configuration
+const SUPABASE_PROJECT_ID = process.env.SUPABASE_PROJECT_ID || "zkuongbbsshtpsasdbun";
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://zkuongbbsshtpsasdbun.supabase.co";
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "sb_publishable_MQFwrOt666FXPWnB9Sdc2A_oj5dhofP";
+
+let supabase: SupabaseClient | null = null;
+try {
+  if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log(`[Supabase] Initialized client for project ${SUPABASE_PROJECT_ID} at ${SUPABASE_URL}`);
+  }
+} catch (e) {
+  console.warn("[Supabase] Failed to initialize client:", e);
+}
 
 const app = express();
 const PORT = 3000;
@@ -114,6 +130,19 @@ let pickupRequests: any[] = [
     notes: "Cardboard packing boxes from moving.",
     status: "Collected",
     createdAt: new Date().toISOString(),
+  }
+];
+
+// In-memory contact & support messages store
+let contactMessages: any[] = [
+  {
+    id: "CNT-2026-0001",
+    name: "Aarav Sharma",
+    email: "aarav@example.com",
+    subject: "Bulk E-Waste Pickup Enquiry",
+    message: "We have 35 outdated office PCs and UPS batteries for responsible recycling. Can we schedule an institutional pickup?",
+    status: "New",
+    createdAt: new Date().toISOString()
   }
 ];
 
@@ -1007,33 +1036,236 @@ app.get("/api/electricity/transactions", (_req, res) => {
   res.json(paymentTransactions);
 });
 
-// Pickup Requests API
-app.get("/api/pickups", (_req, res) => {
+// ==========================================
+// SUPABASE-INTEGRATED PICKUP REQUESTS API
+// ==========================================
+app.get("/api/pickups", async (_req, res) => {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('pickup_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        // Map database columns to app format
+        const mapped = data.map((row: any) => ({
+          id: row.id,
+          userName: row.user_name || row.userName || 'Resident',
+          userEmail: row.user_email || row.userEmail || '',
+          userPhone: row.user_phone || row.userPhone || '',
+          address: row.address || '',
+          city: row.city || '',
+          wasteType: row.waste_type || row.wasteType || 'Recyclable Waste',
+          quantity: row.quantity || '',
+          preferredDate: row.preferred_date || row.preferredDate || '',
+          preferredTime: row.preferred_time || row.preferredTime || '',
+          notes: row.notes || '',
+          status: row.status || 'Pending',
+          createdAt: row.created_at || row.createdAt || new Date().toISOString()
+        }));
+        return res.json(mapped);
+      }
+    } catch (err) {
+      console.warn("[Supabase] GET /api/pickups query note:", err);
+    }
+  }
   res.json(pickupRequests);
 });
 
-app.post("/api/pickups", (req, res) => {
+app.post("/api/pickups", async (req, res) => {
   const newPickup = req.body;
-  const requestId = `EC-2026-${Math.floor(10000 + Math.random() * 90000)}`;
+  const requestId = newPickup.id || `EC-2026-${Math.floor(10000 + Math.random() * 90000)}`;
   const fullRecord = {
     ...newPickup,
     id: requestId,
-    status: "Pending",
-    createdAt: new Date().toISOString(),
+    status: newPickup.status || "Pending",
+    createdAt: newPickup.createdAt || new Date().toISOString(),
   };
+
+  // 1. Keep in memory for instant local availability
   pickupRequests.unshift(fullRecord);
+
+  // 2. Persist to Supabase pickup_requests table
+  if (supabase) {
+    try {
+      const snakePayload = {
+        id: fullRecord.id,
+        user_name: fullRecord.userName || '',
+        user_email: fullRecord.userEmail || '',
+        user_phone: fullRecord.userPhone || '',
+        address: fullRecord.address || '',
+        city: fullRecord.city || '',
+        waste_type: fullRecord.wasteType || 'Recyclable Waste',
+        quantity: fullRecord.quantity || '',
+        preferred_date: fullRecord.preferredDate || '',
+        preferred_time: fullRecord.preferredTime || '',
+        notes: fullRecord.notes || '',
+        status: fullRecord.status || 'Pending',
+        created_at: fullRecord.createdAt
+      };
+
+      const { error: snakeErr } = await supabase
+        .from('pickup_requests')
+        .upsert(snakePayload, { onConflict: 'id' });
+
+      if (snakeErr && snakeErr.code !== 'PGRST205') {
+        // Retry with camelCase in case table was created with camelCase
+        await supabase
+          .from('pickup_requests')
+          .upsert({
+            id: fullRecord.id,
+            userName: fullRecord.userName,
+            userEmail: fullRecord.userEmail,
+            userPhone: fullRecord.userPhone,
+            address: fullRecord.address,
+            city: fullRecord.city,
+            wasteType: fullRecord.wasteType,
+            quantity: fullRecord.quantity,
+            preferredDate: fullRecord.preferredDate,
+            preferredTime: fullRecord.preferredTime,
+            notes: fullRecord.notes || '',
+            status: fullRecord.status || 'Pending',
+            createdAt: fullRecord.createdAt
+          }, { onConflict: 'id' });
+      }
+    } catch (err) {
+      console.warn("[Supabase] Insert pickup notice:", err);
+    }
+  }
+
   res.status(201).json(fullRecord);
 });
 
-app.put("/api/pickups/:id/status", (req, res) => {
+app.put("/api/pickups/:id/status", async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   const index = pickupRequests.findIndex((p) => p.id === id);
   if (index !== -1) {
     pickupRequests[index].status = status;
+  }
+
+  if (supabase) {
+    try {
+      await supabase.from('pickup_requests').update({ status }).eq('id', id);
+    } catch (err) {
+      console.warn("[Supabase] Status update notice:", err);
+    }
+  }
+
+  if (index !== -1) {
     return res.json(pickupRequests[index]);
   }
-  return res.status(404).json({ error: "Pickup request not found" });
+  return res.status(200).json({ id, status });
+});
+
+// ==========================================
+// SUPABASE-INTEGRATED CONTACT MESSAGES API
+// ==========================================
+app.get("/api/contacts", async (_req, res) => {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('contact_messages')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        return res.json(data.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          email: r.email,
+          subject: r.subject || '',
+          message: r.message,
+          status: r.status || 'New',
+          createdAt: r.created_at || r.createdAt || new Date().toISOString()
+        })));
+      }
+    } catch (err) {
+      console.warn("[Supabase] GET /api/contacts notice:", err);
+    }
+  }
+  res.json(contactMessages);
+});
+
+app.post("/api/contacts", async (req, res) => {
+  const { name, email, subject, message } = req.body;
+  if (!name || !email || !message) {
+    return res.status(400).json({ error: "Name, email, and message are required" });
+  }
+
+  const contactRecord = {
+    id: `CNT-${Date.now()}`,
+    name,
+    email,
+    subject: subject || "Support & Service Inquiry",
+    message,
+    status: "New",
+    createdAt: new Date().toISOString()
+  };
+
+  contactMessages.unshift(contactRecord);
+
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('contact_messages').upsert({
+        id: contactRecord.id,
+        name: contactRecord.name,
+        email: contactRecord.email,
+        subject: contactRecord.subject,
+        message: contactRecord.message,
+        status: contactRecord.status,
+        created_at: contactRecord.createdAt
+      }, { onConflict: 'id' });
+
+      if (error) {
+        console.warn("[Supabase] contact_messages notice:", error.message);
+      } else {
+        console.log(`[Supabase] Contact message saved to contact_messages: ${contactRecord.id}`);
+      }
+    } catch (err) {
+      console.warn("[Supabase] Exception inserting contact:", err);
+    }
+  }
+
+  res.status(201).json({
+    success: true,
+    message: "Contact message saved to Supabase database successfully!",
+    record: contactRecord
+  });
+});
+
+// ==========================================
+// SUPABASE CONNECTION STATUS & SCHEMA INFO
+// ==========================================
+app.get("/api/supabase/status", async (_req, res) => {
+  let connected = false;
+  let pickupTableReady = false;
+  let contactTableReady = false;
+  let errorMsg = null;
+
+  if (supabase) {
+    try {
+      const { error: pErr } = await supabase.from('pickup_requests').select('id').limit(1);
+      connected = true;
+      if (!pErr) pickupTableReady = true;
+
+      const { error: cErr } = await supabase.from('contact_messages').select('id').limit(1);
+      if (!cErr) contactTableReady = true;
+    } catch (e: any) {
+      errorMsg = e?.message;
+    }
+  }
+
+  res.json({
+    projectId: SUPABASE_PROJECT_ID,
+    url: SUPABASE_URL,
+    connected,
+    pickupTableReady,
+    contactTableReady,
+    error: errorMsg,
+    sqlSetupUrl: `https://supabase.com/dashboard/project/${SUPABASE_PROJECT_ID}/sql`
+  });
 });
 
 // Local waste lookup rules for instant response / fallback

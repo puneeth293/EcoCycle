@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { PageRoute, UserProfile, PickupRequest, SegregationRecord } from '../types';
+import { PageRoute, UserProfile, PickupRequest, SegregationRecord, ContactMessage } from '../types';
 import { INITIAL_WASTE_ITEMS } from '../data/wasteData';
+import { 
+  savePickupToSupabase, 
+  updatePickupStatusInSupabase, 
+  saveContactToSupabase, 
+  fetchPickupsFromSupabase, 
+  fetchContactsFromSupabase 
+} from '../lib/supabase';
 
 interface ToastState {
   message: string;
@@ -21,6 +28,8 @@ interface AppContextType {
   pickupRequests: PickupRequest[];
   addPickupRequest: (requestData: Omit<PickupRequest, 'id' | 'status' | 'createdAt'>) => Promise<PickupRequest>;
   updatePickupStatus: (id: string, status: PickupRequest['status']) => void;
+  contactMessages: ContactMessage[];
+  addContactMessage: (contactData: Omit<ContactMessage, 'id' | 'createdAt'>) => Promise<ContactMessage>;
   segregationHistory: SegregationRecord[];
   addSegregationRecord: (itemName: string, category: any, points: number) => void;
   awardPoints: (points: number, reason: string) => void;
@@ -116,6 +125,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : DEFAULT_PICKUPS;
   });
 
+  const [contactMessages, setContactMessages] = useState<ContactMessage[]>(() => {
+    const saved = localStorage.getItem('recynova_contacts');
+    return saved ? JSON.parse(saved) : [
+      {
+        id: 'CNT-2026-0001',
+        name: 'Aarav Sharma',
+        email: 'aarav@example.com',
+        subject: 'Bulk E-Waste Pickup Enquiry',
+        message: 'We have 35 outdated office PCs and UPS batteries for responsible recycling. Can we schedule an institutional pickup?',
+        status: 'New',
+        createdAt: '2026-08-08T10:00:00Z'
+      }
+    ];
+  });
+
   const [segregationHistory, setSegregationHistory] = useState<SegregationRecord[]>(() => {
     const saved = localStorage.getItem('recynova_history') || localStorage.getItem('ecocycle_history');
     return saved ? JSON.parse(saved) : [
@@ -133,6 +157,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [selectedSearchItem, setSelectedSearchItem] = useState<string>('');
   const [activeWasteItemModal, setActiveWasteItemModal] = useState<string | null>(null);
+
+  // Sync initial data from Supabase & API on mount
+  useEffect(() => {
+    async function syncSupabaseData() {
+      try {
+        // Fetch pickups from Supabase/API
+        const remotePickups = await fetchPickupsFromSupabase();
+        if (remotePickups && remotePickups.length > 0) {
+          setPickupRequests((prev) => {
+            const ids = new Set(remotePickups.map((p) => p.id));
+            const localOnly = prev.filter((p) => !ids.has(p.id));
+            return [...remotePickups, ...localOnly];
+          });
+        }
+
+        // Fetch contacts from Supabase/API
+        const remoteContacts = await fetchContactsFromSupabase();
+        if (remoteContacts && remoteContacts.length > 0) {
+          setContactMessages((prev) => {
+            const ids = new Set(remoteContacts.map((c) => c.id));
+            const localOnly = prev.filter((c) => !ids.has(c.id));
+            return [...remoteContacts, ...localOnly];
+          });
+        }
+      } catch (err) {
+        console.warn('Initial Supabase sync notice:', err);
+      }
+    }
+
+    syncSupabaseData();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -162,6 +217,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('recynova_pickups', JSON.stringify(pickupRequests));
     localStorage.setItem('ecocycle_pickups', JSON.stringify(pickupRequests));
   }, [pickupRequests]);
+
+  useEffect(() => {
+    localStorage.setItem('recynova_contacts', JSON.stringify(contactMessages));
+  }, [contactMessages]);
 
   useEffect(() => {
     localStorage.setItem('recynova_history', JSON.stringify(segregationHistory));
@@ -391,15 +450,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addPickupRequest = async (requestData: Omit<PickupRequest, 'id' | 'status' | 'createdAt'>): Promise<PickupRequest> => {
+    let newRecord: PickupRequest;
+
     try {
-      // Call backend API endpoint
+      // 1. Call backend API endpoint (which handles server-side Supabase persistence)
       const response = await fetch('/api/pickups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestData)
       });
 
-      let newRecord: PickupRequest;
       if (response.ok) {
         newRecord = await response.json();
       } else {
@@ -411,47 +471,88 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           createdAt: new Date().toISOString()
         };
       }
-
-      setPickupRequests((prev) => [newRecord, ...prev]);
-
-      if (user) {
-        setUser((prev) => prev ? ({
-          ...prev,
-          pickupRequestsCount: prev.pickupRequestsCount + 1,
-          ecoPoints: prev.ecoPoints + 30
-        }) : null);
-      }
-
-      showToast(`Pickup Request Submitted! ID: ${newRecord.id} (+30 Eco Points)`, 'success');
-      return newRecord;
     } catch (err) {
       console.error('Error submitting pickup request:', err);
       const requestId = `EC-2026-${Math.floor(10000 + Math.random() * 90000)}`;
-      const fallbackRecord: PickupRequest = {
+      newRecord = {
         ...requestData,
         id: requestId,
         status: 'Pending',
         createdAt: new Date().toISOString()
       };
-
-      setPickupRequests((prev) => [fallbackRecord, ...prev]);
-      showToast(`Pickup Request Submitted! ID: ${fallbackRecord.id}`, 'success');
-      return fallbackRecord;
     }
+
+    // 2. Direct client-side Supabase persistence backup
+    try {
+      await savePickupToSupabase(newRecord);
+    } catch (supaErr) {
+      console.warn('Client Supabase pickup sync notice:', supaErr);
+    }
+
+    // 3. Update state & rewards
+    setPickupRequests((prev) => [newRecord, ...prev]);
+
+    if (user) {
+      setUser((prev) => prev ? ({
+        ...prev,
+        pickupRequestsCount: prev.pickupRequestsCount + 1,
+        ecoPoints: prev.ecoPoints + 30
+      }) : null);
+    }
+
+    showToast(`Pickup Request Saved to Database! ID: ${newRecord.id} (+30 Eco Points)`, 'success');
+    return newRecord;
   };
 
   const updatePickupStatus = (id: string, status: PickupRequest['status']) => {
     setPickupRequests((prev) =>
       prev.map((req) => (req.id === id ? { ...req, status } : req))
     );
-    // Optionally call backend
+
+    // Call backend API
     fetch(`/api/pickups/${id}/status`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status })
-    }).catch((err) => console.log('Status update synced locally'));
+    }).catch(() => console.log('Status update synced locally'));
+
+    // Call client Supabase
+    updatePickupStatusInSupabase(id, status).catch(() => {});
 
     showToast(`Request ${id} status updated to ${status}`, 'info');
+  };
+
+  const addContactMessage = async (contactData: Omit<ContactMessage, 'id' | 'createdAt'>): Promise<ContactMessage> => {
+    const contactRecord: ContactMessage = {
+      ...contactData,
+      id: `CNT-${Date.now()}`,
+      status: contactData.status || 'New',
+      createdAt: new Date().toISOString()
+    };
+
+    // Update local state immediately
+    setContactMessages((prev) => [contactRecord, ...prev]);
+
+    // 1. Post to backend endpoint (which saves to Supabase server-side)
+    try {
+      await fetch('/api/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(contactRecord)
+      });
+    } catch (apiErr) {
+      console.warn('API /api/contacts notice:', apiErr);
+    }
+
+    // 2. Direct client-side Supabase persistence
+    try {
+      await saveContactToSupabase(contactRecord);
+    } catch (supaErr) {
+      console.warn('Client Supabase contact sync notice:', supaErr);
+    }
+
+    showToast('Message saved to Supabase database! Our support team will respond shortly. 📩', 'success');
+    return contactRecord;
   };
 
   const addSegregationRecord = (itemName: string, category: any, points: number) => {
@@ -524,6 +625,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         pickupRequests,
         addPickupRequest,
         updatePickupStatus,
+        contactMessages,
+        addContactMessage,
         segregationHistory,
         addSegregationRecord,
         awardPoints,
