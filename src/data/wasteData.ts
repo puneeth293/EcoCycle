@@ -168,7 +168,7 @@ export const INITIAL_WASTE_ITEMS: WasteItem[] = [
     actionSteps: [
       'Perform a factory reset to erase personal data.',
       'Remove SIM card and memory cards.',
-      'Schedule an EcoCycle E-Waste pickup or visit an authorized collection kiosk.'
+      'Schedule a Recynova E-Waste pickup or visit an authorized collection kiosk.'
     ],
     recyclingTip: '1 million recycled mobile phones yield 35,000 lbs of copper and 75 lbs of gold!',
     ecoPoints: 30,
@@ -248,7 +248,7 @@ export const INITIAL_WASTE_ITEMS: WasteItem[] = [
     actionSteps: [
       'Bundle neatly with a rubber band.',
       'Store together in an E-Waste box.',
-      'Request EcoCycle pickup or drop off at local E-waste center.'
+      'Request Recynova pickup or drop off at local E-waste center.'
     ],
     recyclingTip: 'Copper wiring inside charging cables is highly valuable and easily meltable for reuse.',
     ecoPoints: 20,

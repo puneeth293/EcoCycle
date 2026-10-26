@@ -3,8 +3,12 @@ import { PickupRequest, ContactMessage } from '../types';
 
 export const SUPABASE_CONFIG = {
   projectId: 'zkuongbbsshtpsasdbun',
-  url: import.meta.env.VITE_SUPABASE_URL || 'https://zkuongbbsshtpsasdbun.supabase.co',
-  anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_MQFwrOt666FXPWnB9Sdc2A_oj5dhofP',
+  url: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || 
+       (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) || 
+       'https://zkuongbbsshtpsasdbun.supabase.co',
+  anonKey: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) || 
+           (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_ANON_KEY) || 
+           'sb_publishable_MQFwrOt666FXPWnB9Sdc2A_oj5dhofP',
   sqlEditorUrl: 'https://supabase.com/dashboard/project/zkuongbbsshtpsasdbun/sql/new',
   tableEditorUrl: 'https://supabase.com/dashboard/project/zkuongbbsshtpsasdbun/editor',
 };
@@ -34,105 +38,137 @@ export const CONTACT_TABLE_CANDIDATES = [
 ];
 
 export const SUPABASE_SQL_SETUP = `-- =================================================================
--- RECYNOVA SUPABASE DATABASE SETUP SCHEMA
--- Run this once in your Supabase SQL Editor:
+-- RECYNOVA SUPABASE DATABASE SETUP & RLS CLEANUP SCRIPT
+-- Run this in your Supabase SQL Editor:
 -- https://supabase.com/dashboard/project/zkuongbbsshtpsasdbun/sql/new
 -- =================================================================
 
--- 1. Table for Online Waste Pickup Requests
+-- 1. Ensure pickup_requests table exists with all standard columns
 CREATE TABLE IF NOT EXISTS public.pickup_requests (
-  id TEXT PRIMARY KEY,
-  user_name TEXT NOT NULL,
-  user_email TEXT NOT NULL,
-  user_phone TEXT NOT NULL,
-  address TEXT NOT NULL,
-  city TEXT NOT NULL,
-  waste_type TEXT NOT NULL,
-  quantity TEXT NOT NULL,
-  preferred_date TEXT NOT NULL,
-  preferred_time TEXT NOT NULL,
-  notes TEXT,
-  status TEXT NOT NULL DEFAULT 'Pending',
-  created_at TIMESTAMPTZ DEFAULT NOW()
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    address TEXT NOT NULL,
+    waste_type TEXT NOT NULL,
+    weight TEXT,
+    preferred_date TEXT,
+    preferred_time TEXT,
+    notes TEXT,
+    status TEXT DEFAULT 'Pending',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
--- Enable Row Level Security (RLS)
-ALTER TABLE public.pickup_requests ENABLE ROW LEVEL SECURITY;
+-- Ensure extended columns exist if table was created with minimal columns
+ALTER TABLE public.pickup_requests ADD COLUMN IF NOT EXISTS city TEXT;
+ALTER TABLE public.pickup_requests ADD COLUMN IF NOT EXISTS user_email TEXT;
+ALTER TABLE public.pickup_requests ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE public.pickup_requests ADD COLUMN IF NOT EXISTS user_name TEXT;
+ALTER TABLE public.pickup_requests ADD COLUMN IF NOT EXISTS user_phone TEXT;
+ALTER TABLE public.pickup_requests ADD COLUMN IF NOT EXISTS quantity TEXT;
 
--- Allow public and authenticated inserts & reads
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE tablename = 'pickup_requests' AND policyname = 'Allow public insert pickup_requests'
-  ) THEN
-    CREATE POLICY "Allow public insert pickup_requests" ON public.pickup_requests FOR INSERT WITH CHECK (true);
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE tablename = 'pickup_requests' AND policyname = 'Allow public select pickup_requests'
-  ) THEN
-    CREATE POLICY "Allow public select pickup_requests" ON public.pickup_requests FOR SELECT USING (true);
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE tablename = 'pickup_requests' AND policyname = 'Allow public update pickup_requests'
-  ) THEN
-    CREATE POLICY "Allow public update pickup_requests" ON public.pickup_requests FOR UPDATE USING (true);
-  END IF;
-END $$;
-
--- 2. Table for Contact & Support Messages
+-- 2. Ensure contact_messages table exists
 CREATE TABLE IF NOT EXISTS public.contact_messages (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  email TEXT NOT NULL,
-  subject TEXT,
-  message TEXT NOT NULL,
-  status TEXT DEFAULT 'New',
-  created_at TIMESTAMPTZ DEFAULT NOW()
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    phone TEXT,
+    subject TEXT,
+    message TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
--- Enable Row Level Security (RLS)
+-- Ensure status column exists in contact_messages
+ALTER TABLE public.contact_messages ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'New';
+
+-- 3. Enable Row Level Security (RLS)
+ALTER TABLE public.pickup_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contact_messages ENABLE ROW LEVEL SECURITY;
 
--- Allow public and authenticated inserts & reads
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE tablename = 'contact_messages' AND policyname = 'Allow public insert contact_messages'
-  ) THEN
-    CREATE POLICY "Allow public insert contact_messages" ON public.contact_messages FOR INSERT WITH CHECK (true);
-  END IF;
+-- 4. Clean up any duplicate/legacy policies first to avoid policy conflicts
+DROP POLICY IF EXISTS "Allow public insert to pickup_requests" ON public.pickup_requests;
+DROP POLICY IF EXISTS "Allow public select on pickup_requests" ON public.pickup_requests;
+DROP POLICY IF EXISTS "Allow public update on pickup_requests" ON public.pickup_requests;
+DROP POLICY IF EXISTS "Allow public insert to contact_messages" ON public.contact_messages;
+DROP POLICY IF EXISTS "Allow public select on contact_messages" ON public.contact_messages;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE tablename = 'contact_messages' AND policyname = 'Allow public select contact_messages'
-  ) THEN
-    CREATE POLICY "Allow public select contact_messages" ON public.contact_messages FOR SELECT USING (true);
-  END IF;
-END $$;
+DROP POLICY IF EXISTS "Allow public insert pickup_requests" ON public.pickup_requests;
+DROP POLICY IF EXISTS "Allow public select pickup_requests" ON public.pickup_requests;
+DROP POLICY IF EXISTS "Allow public update pickup_requests" ON public.pickup_requests;
+DROP POLICY IF EXISTS "Allow public delete pickup_requests" ON public.pickup_requests;
+DROP POLICY IF EXISTS "Allow public insert contact_messages" ON public.contact_messages;
+DROP POLICY IF EXISTS "Allow public select contact_messages" ON public.contact_messages;
+DROP POLICY IF EXISTS "Allow public update contact_messages" ON public.contact_messages;
+DROP POLICY IF EXISTS "Allow public delete contact_messages" ON public.contact_messages;
+
+-- 5. Create unified, least-privilege policies for Recynova app operations
+-- Pickup Requests Policies
+CREATE POLICY "Allow public select pickup_requests" ON public.pickup_requests
+    FOR SELECT TO anon, authenticated USING (true);
+
+CREATE POLICY "Allow public insert pickup_requests" ON public.pickup_requests
+    FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+CREATE POLICY "Allow public update pickup_requests" ON public.pickup_requests
+    FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow public delete pickup_requests" ON public.pickup_requests
+    FOR DELETE TO anon, authenticated USING (true);
+
+-- Contact Messages Policies
+CREATE POLICY "Allow public select contact_messages" ON public.contact_messages
+    FOR SELECT TO anon, authenticated USING (true);
+
+CREATE POLICY "Allow public insert contact_messages" ON public.contact_messages
+    FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+CREATE POLICY "Allow public update contact_messages" ON public.contact_messages
+    FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow public delete contact_messages" ON public.contact_messages
+    FOR DELETE TO anon, authenticated USING (true);
 `;
 
 /**
- * Save a pickup request across candidate table names
+ * Save a pickup request adaptively across Supabase table schemas
  */
 export async function savePickupToSupabase(record: PickupRequest): Promise<{ success: boolean; table?: string; error?: string }> {
   try {
-    const snakePayload = {
+    const formattedAddress = record.city && !record.address.toLowerCase().includes(record.city.toLowerCase())
+      ? `${record.address}, ${record.city}`
+      : record.address;
+
+    const emailNoteTag = record.userEmail ? `[Email: ${record.userEmail}]` : '';
+    const formattedNotes = emailNoteTag
+      ? `${emailNoteTag} ${record.notes || ''}`.trim()
+      : (record.notes || '');
+
+    // Format 1: Exact current Supabase schema (name, phone, address, waste_type, weight, preferred_date, preferred_time, notes, status, created_at)
+    const standardPayload = {
       id: record.id,
-      user_name: record.userName,
-      user_email: record.userEmail,
-      user_phone: record.userPhone,
-      address: record.address,
-      city: record.city,
+      name: record.userName,
+      phone: record.userPhone,
+      address: formattedAddress,
       waste_type: record.wasteType,
-      quantity: record.quantity,
+      weight: record.quantity,
       preferred_date: record.preferredDate,
       preferred_time: record.preferredTime,
-      notes: record.notes || '',
+      notes: formattedNotes,
       status: record.status || 'Pending',
       created_at: record.createdAt || new Date().toISOString(),
     };
 
+    // Format 2: Extended snake_case payload (if user created extended columns)
+    const extendedPayload = {
+      ...standardPayload,
+      user_name: record.userName,
+      user_email: record.userEmail,
+      email: record.userEmail,
+      user_phone: record.userPhone,
+      city: record.city,
+      quantity: record.quantity,
+    };
+
+    // Format 3: camelCase payload
     const camelPayload = {
       id: record.id,
       userName: record.userName,
@@ -149,28 +185,40 @@ export async function savePickupToSupabase(record: PickupRequest): Promise<{ suc
       createdAt: record.createdAt || new Date().toISOString(),
     };
 
-    // Try primary and variant table names
     for (const tableName of PICKUP_TABLE_CANDIDATES) {
-      // 1. Try snake_case
-      const { error: snakeErr } = await supabase
+      // 1. Try standard payload matching current Supabase schema
+      const { error: stdErr } = await supabase
         .from(tableName)
-        .upsert(snakePayload, { onConflict: 'id' });
+        .upsert(standardPayload, { onConflict: 'id' });
 
-      if (!snakeErr) {
-        console.log(`✅ Pickup request saved to Supabase table '${tableName}':`, record.id);
+      if (!stdErr) {
+        console.log(`✅ Pickup request saved to Supabase table '${tableName}' (standard):`, record.id);
         return { success: true, table: tableName };
       }
 
-      // If error is NOT "table not found", try camelCase on this table
-      if (snakeErr.code !== 'PGRST205') {
-        const { error: camelErr } = await supabase
-          .from(tableName)
-          .upsert(camelPayload, { onConflict: 'id' });
+      // 2. If standard failed because of missing table, continue to next table
+      if (stdErr.code === 'PGRST205') {
+        continue;
+      }
 
-        if (!camelErr) {
-          console.log(`✅ Pickup request saved to Supabase table '${tableName}' (camelCase):`, record.id);
-          return { success: true, table: tableName };
-        }
+      // 3. Try extended payload
+      const { error: extErr } = await supabase
+        .from(tableName)
+        .upsert(extendedPayload, { onConflict: 'id' });
+
+      if (!extErr) {
+        console.log(`✅ Pickup request saved to Supabase table '${tableName}' (extended):`, record.id);
+        return { success: true, table: tableName };
+      }
+
+      // 4. Try camelCase payload
+      const { error: camelErr } = await supabase
+        .from(tableName)
+        .upsert(camelPayload, { onConflict: 'id' });
+
+      if (!camelErr) {
+        console.log(`✅ Pickup request saved to Supabase table '${tableName}' (camelCase):`, record.id);
+        return { success: true, table: tableName };
       }
     }
 
@@ -203,7 +251,26 @@ export async function updatePickupStatusInSupabase(id: string, status: PickupReq
 }
 
 /**
- * Fetch pickup requests from Supabase
+ * Delete pickup request from Supabase
+ */
+export async function deletePickupFromSupabase(id: string): Promise<boolean> {
+  try {
+    for (const tableName of PICKUP_TABLE_CANDIDATES) {
+      const { error } = await supabase
+        .from(tableName)
+        .delete()
+        .eq('id', id);
+
+      if (!error) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fetch pickup requests from Supabase with robust multi-column schema mapping
  */
 export async function fetchPickupsFromSupabase(): Promise<PickupRequest[] | null> {
   try {
@@ -213,22 +280,43 @@ export async function fetchPickupsFromSupabase(): Promise<PickupRequest[] | null
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
-        return data.map((row: any) => ({
-          id: row.id,
-          userName: row.user_name || row.userName || 'Resident',
-          userEmail: row.user_email || row.userEmail || '',
-          userPhone: row.user_phone || row.userPhone || '',
-          address: row.address || '',
-          city: row.city || '',
-          wasteType: row.waste_type || row.wasteType || 'Recyclable Waste',
-          quantity: row.quantity || '',
-          preferredDate: row.preferred_date || row.preferredDate || '',
-          preferredTime: row.preferred_time || row.preferredTime || '',
-          notes: row.notes || '',
-          status: (row.status as any) || 'Pending',
-          createdAt: row.created_at || row.createdAt || new Date().toISOString(),
-        }));
+      if (!error && Array.isArray(data)) {
+        return data.map((row: any) => {
+          // Robust email extraction
+          let email = row.user_email || row.userEmail || row.email || '';
+          let notes = row.notes || '';
+          if (!email && notes && notes.includes('[Email: ')) {
+            const match = notes.match(/\[Email:\s*([^\]]+)\]/);
+            if (match) {
+              email = match[1].trim();
+              notes = notes.replace(/\[Email:\s*[^\]]+\]\s*/, '').trim();
+            }
+          }
+
+          // Robust address & city extraction
+          let address = row.address || '';
+          let city = row.city || '';
+          if (!city && address.includes(',')) {
+            const parts = address.split(',');
+            city = parts[parts.length - 1].trim();
+          }
+
+          return {
+            id: row.id,
+            userName: row.name || row.user_name || row.userName || 'Resident',
+            userEmail: email,
+            userPhone: row.phone || row.user_phone || row.userPhone || '',
+            address: address,
+            city: city || 'Tumkur',
+            wasteType: row.waste_type || row.wasteType || 'Recyclable Waste',
+            quantity: row.weight || row.quantity || '10 kg',
+            preferredDate: row.preferred_date || row.preferredDate || '',
+            preferredTime: row.preferred_time || row.preferredTime || '',
+            notes: notes,
+            status: (row.status as any) || 'Pending',
+            createdAt: row.created_at || row.createdAt || new Date().toISOString(),
+          };
+        });
       }
     }
     return null;
@@ -238,27 +326,49 @@ export async function fetchPickupsFromSupabase(): Promise<PickupRequest[] | null
 }
 
 /**
- * Save contact message across candidate table names
+ * Save contact message adaptively across Supabase table schemas
  */
 export async function saveContactToSupabase(contact: ContactMessage): Promise<{ success: boolean; table?: string; error?: string }> {
   try {
-    const payload = {
+    // Standard payload without status (matches current Supabase table schema)
+    const standardPayload = {
       id: contact.id,
       name: contact.name,
       email: contact.email,
+      phone: contact.phone || null,
       subject: contact.subject || '',
       message: contact.message,
-      status: contact.status || 'New',
       created_at: contact.createdAt || new Date().toISOString(),
     };
 
-    for (const tableName of CONTACT_TABLE_CANDIDATES) {
-      const { error } = await supabase
-        .from(tableName)
-        .upsert(payload, { onConflict: 'id' });
+    // Extended payload with status (if status column was added)
+    const extendedPayload = {
+      ...standardPayload,
+      status: contact.status || 'New',
+    };
 
-      if (!error) {
-        console.log(`✅ Contact message saved to Supabase table '${tableName}':`, contact.id);
+    for (const tableName of CONTACT_TABLE_CANDIDATES) {
+      // 1. Try standard payload
+      const { error: stdErr } = await supabase
+        .from(tableName)
+        .upsert(standardPayload, { onConflict: 'id' });
+
+      if (!stdErr) {
+        console.log(`✅ Contact message saved to Supabase table '${tableName}' (standard):`, contact.id);
+        return { success: true, table: tableName };
+      }
+
+      if (stdErr.code === 'PGRST205') {
+        continue;
+      }
+
+      // 2. Try extended payload with status
+      const { error: extErr } = await supabase
+        .from(tableName)
+        .upsert(extendedPayload, { onConflict: 'id' });
+
+      if (!extErr) {
+        console.log(`✅ Contact message saved to Supabase table '${tableName}' (with status):`, contact.id);
         return { success: true, table: tableName };
       }
     }
@@ -283,13 +393,14 @@ export async function fetchContactsFromSupabase(): Promise<ContactMessage[] | nu
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         return data.map((row: any) => ({
           id: row.id,
-          name: row.name,
-          email: row.email,
+          name: row.name || 'Anonymous',
+          email: row.email || '',
+          phone: row.phone || '',
           subject: row.subject || '',
-          message: row.message,
+          message: row.message || '',
           status: row.status || 'New',
           createdAt: row.created_at || row.createdAt || new Date().toISOString(),
         }));
@@ -298,6 +409,25 @@ export async function fetchContactsFromSupabase(): Promise<ContactMessage[] | nu
     return null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Delete contact message from Supabase
+ */
+export async function deleteContactFromSupabase(id: string): Promise<boolean> {
+  try {
+    for (const tableName of CONTACT_TABLE_CANDIDATES) {
+      const { error } = await supabase
+        .from(tableName)
+        .delete()
+        .eq('id', id);
+
+      if (!error) return true;
+    }
+    return false;
+  } catch {
+    return false;
   }
 }
 

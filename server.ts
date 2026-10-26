@@ -148,7 +148,7 @@ let contactMessages: any[] = [
 
 // Health endpoint
 app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", service: "EcoCycle API", timestamp: new Date() });
+  res.json({ status: "ok", service: "Recynova API", timestamp: new Date() });
 });
 
 // AI Bot Assistance Copilot endpoint
@@ -1066,22 +1066,44 @@ app.get("/api/pickups", async (_req, res) => {
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (!error && data && data.length > 0) {
-          const mapped = data.map((row: any) => ({
-            id: row.id,
-            userName: row.user_name || row.userName || 'Resident',
-            userEmail: row.user_email || row.userEmail || '',
-            userPhone: row.user_phone || row.userPhone || '',
-            address: row.address || '',
-            city: row.city || '',
-            wasteType: row.waste_type || row.wasteType || 'Recyclable Waste',
-            quantity: row.quantity || '',
-            preferredDate: row.preferred_date || row.preferredDate || '',
-            preferredTime: row.preferred_time || row.preferredTime || '',
-            notes: row.notes || '',
-            status: row.status || 'Pending',
-            createdAt: row.created_at || row.createdAt || new Date().toISOString()
-          }));
+        if (!error && Array.isArray(data)) {
+          const mapped = data.map((row: any) => {
+            let email = row.user_email || row.userEmail || row.email || '';
+            let notes = row.notes || '';
+            if (!email && notes && notes.includes('[Email: ')) {
+              const match = notes.match(/\[Email:\s*([^\]]+)\]/);
+              if (match) {
+                email = match[1].trim();
+                notes = notes.replace(/\[Email:\s*[^\]]+\]\s*/, '').trim();
+              }
+            }
+
+            let address = row.address || '';
+            let city = row.city || '';
+            if (!city && address.includes(',')) {
+              const parts = address.split(',');
+              city = parts[parts.length - 1].trim();
+            }
+
+            return {
+              id: row.id,
+              userName: row.name || row.user_name || row.userName || 'Resident',
+              userEmail: email,
+              userPhone: row.phone || row.user_phone || row.userPhone || '',
+              address: address,
+              city: city || 'Tumkur',
+              wasteType: row.waste_type || row.wasteType || 'Recyclable Waste',
+              quantity: row.weight || row.quantity || '10 kg',
+              preferredDate: row.preferred_date || row.preferredDate || '',
+              preferredTime: row.preferred_time || row.preferredTime || '',
+              notes: notes,
+              status: row.status || 'Pending',
+              createdAt: row.created_at || row.createdAt || new Date().toISOString()
+            };
+          });
+
+          // Sync to in-memory cache
+          pickupRequests = mapped;
           return res.json(mapped);
         }
       } catch (err) {
@@ -1094,7 +1116,7 @@ app.get("/api/pickups", async (_req, res) => {
 
 app.post("/api/pickups", async (req, res) => {
   const newPickup = req.body;
-  const requestId = newPickup.id || `EC-2026-${Math.floor(10000 + Math.random() * 90000)}`;
+  const requestId = newPickup.id || `RN-2026-${Math.floor(10000 + Math.random() * 90000)}`;
   const fullRecord = {
     ...newPickup,
     id: requestId,
@@ -1111,22 +1133,42 @@ app.post("/api/pickups", async (req, res) => {
   let supabaseError: string | null = null;
 
   if (supabase) {
-    const snakePayload = {
+    const formattedAddress = fullRecord.city && !fullRecord.address.toLowerCase().includes(fullRecord.city.toLowerCase())
+      ? `${fullRecord.address}, ${fullRecord.city}`
+      : fullRecord.address;
+
+    const emailNoteTag = fullRecord.userEmail ? `[Email: ${fullRecord.userEmail}]` : '';
+    const formattedNotes = emailNoteTag
+      ? `${emailNoteTag} ${fullRecord.notes || ''}`.trim()
+      : (fullRecord.notes || '');
+
+    // Standard payload matching existing Supabase schema
+    const standardPayload = {
       id: fullRecord.id,
-      user_name: fullRecord.userName || '',
-      user_email: fullRecord.userEmail || '',
-      user_phone: fullRecord.userPhone || '',
-      address: fullRecord.address || '',
-      city: fullRecord.city || '',
+      name: fullRecord.userName || 'Resident',
+      phone: fullRecord.userPhone || '',
+      address: formattedAddress || '',
       waste_type: fullRecord.wasteType || 'Recyclable Waste',
-      quantity: fullRecord.quantity || '',
+      weight: fullRecord.quantity || '10 kg',
       preferred_date: fullRecord.preferredDate || '',
       preferred_time: fullRecord.preferredTime || '',
-      notes: fullRecord.notes || '',
+      notes: formattedNotes,
       status: fullRecord.status || 'Pending',
       created_at: fullRecord.createdAt
     };
 
+    // Extended snake_case payload
+    const extendedPayload = {
+      ...standardPayload,
+      user_name: fullRecord.userName || '',
+      user_email: fullRecord.userEmail || '',
+      email: fullRecord.userEmail || '',
+      user_phone: fullRecord.userPhone || '',
+      city: fullRecord.city || '',
+      quantity: fullRecord.quantity || '',
+    };
+
+    // CamelCase payload
     const camelPayload = {
       id: fullRecord.id,
       userName: fullRecord.userName,
@@ -1145,30 +1187,44 @@ app.post("/api/pickups", async (req, res) => {
 
     for (const tableName of PICKUP_TABLE_CANDIDATES) {
       try {
-        const { error: snakeErr } = await supabase
+        // 1. Try standard payload
+        const { error: stdErr } = await supabase
           .from(tableName)
-          .upsert(snakePayload, { onConflict: 'id' });
+          .upsert(standardPayload, { onConflict: 'id' });
 
-        if (!snakeErr) {
+        if (!stdErr) {
           supabaseSaved = true;
           savedTable = tableName;
           break;
         }
 
-        if (snakeErr.code !== 'PGRST205') {
-          const { error: camelErr } = await supabase
-            .from(tableName)
-            .upsert(camelPayload, { onConflict: 'id' });
-
-          if (!camelErr) {
-            supabaseSaved = true;
-            savedTable = tableName;
-            break;
-          }
-          supabaseError = camelErr.message;
-        } else {
-          supabaseError = snakeErr.message;
+        if (stdErr.code === 'PGRST205') {
+          continue;
         }
+
+        // 2. Try extended payload
+        const { error: extErr } = await supabase
+          .from(tableName)
+          .upsert(extendedPayload, { onConflict: 'id' });
+
+        if (!extErr) {
+          supabaseSaved = true;
+          savedTable = tableName;
+          break;
+        }
+
+        // 3. Try camelCase payload
+        const { error: camelErr } = await supabase
+          .from(tableName)
+          .upsert(camelPayload, { onConflict: 'id' });
+
+        if (!camelErr) {
+          supabaseSaved = true;
+          savedTable = tableName;
+          break;
+        }
+
+        supabaseError = stdErr.message || extErr.message || camelErr.message;
       } catch (err: any) {
         supabaseError = err?.message;
       }
@@ -1179,7 +1235,7 @@ app.post("/api/pickups", async (req, res) => {
     ...fullRecord,
     supabaseSaved,
     savedTable,
-    supabaseError: supabaseSaved ? null : (supabaseError || "Table 'pickup_requests' not created in Supabase project yet")
+    supabaseError: supabaseSaved ? null : (supabaseError || "Table 'pickup_requests' not found in Supabase")
   });
 });
 
@@ -1206,6 +1262,22 @@ app.put("/api/pickups/:id/status", async (req, res) => {
   return res.status(200).json({ id, status });
 });
 
+app.delete("/api/pickups/:id", async (req, res) => {
+  const { id } = req.params;
+  pickupRequests = pickupRequests.filter((p) => p.id !== id);
+
+  if (supabase) {
+    for (const tableName of PICKUP_TABLE_CANDIDATES) {
+      try {
+        const { error } = await supabase.from(tableName).delete().eq('id', id);
+        if (!error) break;
+      } catch {}
+    }
+  }
+
+  return res.json({ success: true, id });
+});
+
 // ==========================================
 // SUPABASE-INTEGRATED CONTACT MESSAGES API
 // ==========================================
@@ -1218,16 +1290,19 @@ app.get("/api/contacts", async (_req, res) => {
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (!error && data && data.length > 0) {
-          return res.json(data.map((r: any) => ({
+        if (!error && Array.isArray(data)) {
+          const mapped = data.map((r: any) => ({
             id: r.id,
-            name: r.name,
-            email: r.email,
+            name: r.name || 'Anonymous',
+            email: r.email || '',
+            phone: r.phone || '',
             subject: r.subject || '',
-            message: r.message,
-            status: r.status || 'New',
+            message: r.message || '',
+            status: r.status || 'Received',
             createdAt: r.created_at || r.createdAt || new Date().toISOString()
-          })));
+          }));
+          contactMessages = mapped;
+          return res.json(mapped);
         }
       } catch {}
     }
@@ -1236,7 +1311,7 @@ app.get("/api/contacts", async (_req, res) => {
 });
 
 app.post("/api/contacts", async (req, res) => {
-  const { name, email, subject, message } = req.body;
+  const { name, email, phone, subject, message } = req.body;
   if (!name || !email || !message) {
     return res.status(400).json({ error: "Name, email, and message are required" });
   }
@@ -1245,6 +1320,7 @@ app.post("/api/contacts", async (req, res) => {
     id: `CNT-${Date.now()}`,
     name,
     email,
+    phone: phone || '',
     subject: subject || "Support & Service Inquiry",
     message,
     status: "New",
@@ -1258,26 +1334,46 @@ app.post("/api/contacts", async (req, res) => {
   let supabaseError: string | null = null;
 
   if (supabase) {
+    const standardPayload = {
+      id: contactRecord.id,
+      name: contactRecord.name,
+      email: contactRecord.email,
+      phone: contactRecord.phone || null,
+      subject: contactRecord.subject,
+      message: contactRecord.message,
+      created_at: contactRecord.createdAt
+    };
+
+    const extendedPayload = {
+      ...standardPayload,
+      status: contactRecord.status,
+    };
+
     for (const tableName of CONTACT_TABLE_CANDIDATES) {
       try {
-        const { error } = await supabase.from(tableName).upsert({
-          id: contactRecord.id,
-          name: contactRecord.name,
-          email: contactRecord.email,
-          subject: contactRecord.subject,
-          message: contactRecord.message,
-          status: contactRecord.status,
-          created_at: contactRecord.createdAt
-        }, { onConflict: 'id' });
-
-        if (!error) {
+        // 1. Try standard payload
+        const { error: stdErr } = await supabase.from(tableName).upsert(standardPayload, { onConflict: 'id' });
+        if (!stdErr) {
           supabaseSaved = true;
           savedTable = tableName;
-          console.log(`[Supabase] Contact saved to '${tableName}': ${contactRecord.id}`);
+          console.log(`[Supabase] Contact saved to '${tableName}' (standard): ${contactRecord.id}`);
           break;
-        } else {
-          supabaseError = error.message;
         }
+
+        if (stdErr.code === 'PGRST205') {
+          continue;
+        }
+
+        // 2. Try extended payload with status
+        const { error: extErr } = await supabase.from(tableName).upsert(extendedPayload, { onConflict: 'id' });
+        if (!extErr) {
+          supabaseSaved = true;
+          savedTable = tableName;
+          console.log(`[Supabase] Contact saved to '${tableName}' (extended): ${contactRecord.id}`);
+          break;
+        }
+
+        supabaseError = stdErr.message || extErr.message;
       } catch (err: any) {
         supabaseError = err?.message;
       }
@@ -1288,7 +1384,7 @@ app.post("/api/contacts", async (req, res) => {
     success: true,
     message: supabaseSaved 
       ? `Contact message saved to Supabase table '${savedTable}'!` 
-      : "Message saved locally. Create 'contact_messages' table in Supabase to sync.",
+      : "Message saved locally.",
     record: contactRecord,
     supabaseSaved,
     savedTable,
@@ -1296,7 +1392,23 @@ app.post("/api/contacts", async (req, res) => {
   });
 });
 
-// Bulk sync endpoint to sync all local data to Supabase once tables are created
+app.delete("/api/contacts/:id", async (req, res) => {
+  const { id } = req.params;
+  contactMessages = contactMessages.filter((c) => c.id !== id);
+
+  if (supabase) {
+    for (const tableName of CONTACT_TABLE_CANDIDATES) {
+      try {
+        const { error } = await supabase.from(tableName).delete().eq('id', id);
+        if (!error) break;
+      } catch {}
+    }
+  }
+
+  return res.json({ success: true, id });
+});
+
+// Bulk sync endpoint to sync all local data to Supabase
 app.post("/api/supabase/sync-all", async (req, res) => {
   const { pickups = [], contacts = [] } = req.body;
   let syncedPickups = 0;
@@ -1307,23 +1419,31 @@ app.post("/api/supabase/sync-all", async (req, res) => {
   if (supabase) {
     // 1. Sync pickups
     for (const p of pickups) {
-      for (const tableName of PICKUP_TABLE_CANDIDATES) {
-        const { error } = await supabase.from(tableName).upsert({
-          id: p.id,
-          user_name: p.userName,
-          user_email: p.userEmail,
-          user_phone: p.userPhone,
-          address: p.address,
-          city: p.city,
-          waste_type: p.wasteType,
-          quantity: p.quantity,
-          preferred_date: p.preferredDate,
-          preferred_time: p.preferredTime,
-          notes: p.notes || '',
-          status: p.status || 'Pending',
-          created_at: p.createdAt || new Date().toISOString()
-        }, { onConflict: 'id' });
+      const formattedAddress = p.city && !p.address.toLowerCase().includes(p.city.toLowerCase())
+        ? `${p.address}, ${p.city}`
+        : p.address;
 
+      const emailNoteTag = p.userEmail ? `[Email: ${p.userEmail}]` : '';
+      const formattedNotes = emailNoteTag
+        ? `${emailNoteTag} ${p.notes || ''}`.trim()
+        : (p.notes || '');
+
+      const payload = {
+        id: p.id,
+        name: p.userName || 'Resident',
+        phone: p.userPhone || '',
+        address: formattedAddress || '',
+        waste_type: p.wasteType || 'Recyclable Waste',
+        weight: p.quantity || '10 kg',
+        preferred_date: p.preferredDate || '',
+        preferred_time: p.preferredTime || '',
+        notes: formattedNotes,
+        status: p.status || 'Pending',
+        created_at: p.createdAt || new Date().toISOString()
+      };
+
+      for (const tableName of PICKUP_TABLE_CANDIDATES) {
+        const { error } = await supabase.from(tableName).upsert(payload, { onConflict: 'id' });
         if (!error) {
           syncedPickups++;
           break;
@@ -1335,17 +1455,18 @@ app.post("/api/supabase/sync-all", async (req, res) => {
 
     // 2. Sync contacts
     for (const c of contacts) {
-      for (const tableName of CONTACT_TABLE_CANDIDATES) {
-        const { error } = await supabase.from(tableName).upsert({
-          id: c.id,
-          name: c.name,
-          email: c.email,
-          subject: c.subject || '',
-          message: c.message,
-          status: c.status || 'New',
-          created_at: c.createdAt || new Date().toISOString()
-        }, { onConflict: 'id' });
+      const payload = {
+        id: c.id,
+        name: c.name || 'Anonymous',
+        email: c.email || '',
+        phone: c.phone || null,
+        subject: c.subject || '',
+        message: c.message || '',
+        created_at: c.createdAt || new Date().toISOString()
+      };
 
+      for (const tableName of CONTACT_TABLE_CANDIDATES) {
+        const { error } = await supabase.from(tableName).upsert(payload, { onConflict: 'id' });
         if (!error) {
           syncedContacts++;
           break;

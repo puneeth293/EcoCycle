@@ -16,12 +16,22 @@ import {
   CheckCircle2, 
   Copy, 
   ExternalLink, 
-  RefreshCw,
-  AlertCircle
+  RefreshCw, 
+  AlertCircle,
+  Trash2
 } from 'lucide-react';
 
 export const AdminView: React.FC = () => {
-  const { pickupRequests, updatePickupStatus, contactMessages, showToast } = useApp();
+  const { 
+    pickupRequests, 
+    updatePickupStatus, 
+    deletePickupRequest, 
+    contactMessages, 
+    deleteContactMessage, 
+    refreshFromSupabase, 
+    isSyncingSupabase, 
+    showToast 
+  } = useApp();
 
   const [activeTab, setActiveTab] = useState<'pickups' | 'contacts' | 'supabase' | 'centers'>('pickups');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
@@ -222,6 +232,16 @@ export const AdminView: React.FC = () => {
 
                 {/* Filter Controls */}
                 <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => refreshFromSupabase()}
+                    disabled={isSyncingSupabase}
+                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${isSyncingSupabase ? 'animate-spin' : ''}`} />
+                    <span>{isSyncingSupabase ? 'Syncing...' : 'Refresh Supabase'}</span>
+                  </button>
+
                   <div className="relative">
                     <Search className="w-4 h-4 text-emerald-600 absolute left-3 top-2.5" />
                     <input
@@ -259,6 +279,7 @@ export const AdminView: React.FC = () => {
                       <th className="py-3 px-3">Waste / Qty</th>
                       <th className="py-3 px-3">Schedule Date</th>
                       <th className="py-3 px-3">Update Status</th>
+                      <th className="py-3 px-3 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-emerald-50 font-semibold text-[#063B32]">
@@ -291,6 +312,20 @@ export const AdminView: React.FC = () => {
                             <option value="Completed">🏆 Completed</option>
                           </select>
                         </td>
+                        <td className="py-3 px-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`Delete pickup request ${req.id} from database?`)) {
+                                deletePickupRequest(req.id);
+                              }
+                            }}
+                            title="Delete Request"
+                            className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -314,15 +349,27 @@ export const AdminView: React.FC = () => {
                 </p>
               </div>
 
-              <div className="relative">
-                <Search className="w-4 h-4 text-emerald-600 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Search messages..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 pr-3 py-1.5 rounded-xl bg-white border border-emerald-200 text-xs font-semibold text-[#063B32] focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => refreshFromSupabase()}
+                  disabled={isSyncingSupabase}
+                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${isSyncingSupabase ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingSupabase ? 'Syncing...' : 'Refresh Supabase'}</span>
+                </button>
+
+                <div className="relative">
+                  <Search className="w-4 h-4 text-emerald-600 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="Search messages..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 pr-3 py-1.5 rounded-xl bg-white border border-emerald-200 text-xs font-semibold text-[#063B32] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
               </div>
             </div>
 
@@ -343,6 +390,7 @@ export const AdminView: React.FC = () => {
                       <th className="py-3 px-3">Subject</th>
                       <th className="py-3 px-3">Message Content</th>
                       <th className="py-3 px-3">Status</th>
+                      <th className="py-3 px-3 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-emerald-50 font-semibold text-[#063B32]">
@@ -359,6 +407,20 @@ export const AdminView: React.FC = () => {
                           <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
                             {msg.status || 'Received'}
                           </span>
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`Delete message from ${msg.name}?`)) {
+                                deleteContactMessage(msg.id);
+                              }
+                            }}
+                            title="Delete Message"
+                            className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </td>
                       </tr>
                     ))}

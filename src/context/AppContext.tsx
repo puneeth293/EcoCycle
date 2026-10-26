@@ -6,7 +6,9 @@ import {
   updatePickupStatusInSupabase, 
   saveContactToSupabase, 
   fetchPickupsFromSupabase, 
-  fetchContactsFromSupabase 
+  fetchContactsFromSupabase,
+  deletePickupFromSupabase,
+  deleteContactFromSupabase
 } from '../lib/supabase';
 
 interface ToastState {
@@ -28,8 +30,12 @@ interface AppContextType {
   pickupRequests: PickupRequest[];
   addPickupRequest: (requestData: Omit<PickupRequest, 'id' | 'status' | 'createdAt'>) => Promise<PickupRequest>;
   updatePickupStatus: (id: string, status: PickupRequest['status']) => void;
+  deletePickupRequest: (id: string) => Promise<boolean>;
   contactMessages: ContactMessage[];
   addContactMessage: (contactData: Omit<ContactMessage, 'id' | 'createdAt'>) => Promise<ContactMessage>;
+  deleteContactMessage: (id: string) => Promise<boolean>;
+  refreshFromSupabase: () => Promise<void>;
+  isSyncingSupabase: boolean;
   segregationHistory: SegregationRecord[];
   addSegregationRecord: (itemName: string, category: any, points: number) => void;
   awardPoints: (points: number, reason: string) => void;
@@ -157,6 +163,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [selectedSearchItem, setSelectedSearchItem] = useState<string>('');
   const [activeWasteItemModal, setActiveWasteItemModal] = useState<string | null>(null);
+  const [isSyncingSupabase, setIsSyncingSupabase] = useState<boolean>(false);
+
+  const refreshFromSupabase = async () => {
+    setIsSyncingSupabase(true);
+    try {
+      const [remotePickups, remoteContacts] = await Promise.all([
+        fetchPickupsFromSupabase(),
+        fetchContactsFromSupabase()
+      ]);
+
+      if (remotePickups && remotePickups.length > 0) {
+        setPickupRequests((prev) => {
+          const remoteIds = new Set(remotePickups.map((p) => p.id));
+          const localOnly = prev.filter((p) => !remoteIds.has(p.id));
+          return [...remotePickups, ...localOnly];
+        });
+      }
+
+      if (remoteContacts && remoteContacts.length > 0) {
+        setContactMessages((prev) => {
+          const remoteIds = new Set(remoteContacts.map((c) => c.id));
+          const localOnly = prev.filter((c) => !remoteIds.has(c.id));
+          return [...remoteContacts, ...localOnly];
+        });
+      }
+
+      showToast('Data synced & refreshed from Supabase! 🔄', 'success');
+    } catch (err: any) {
+      showToast('Could not refresh from Supabase: ' + (err?.message || 'Network error'), 'error');
+    } finally {
+      setIsSyncingSupabase(false);
+    }
+  };
 
   // Sync initial data from Supabase & API on mount
   useEffect(() => {
@@ -463,7 +502,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (response.ok) {
         newRecord = await response.json();
       } else {
-        const requestId = `EC-2026-${Math.floor(10000 + Math.random() * 90000)}`;
+        const requestId = `RN-2026-${Math.floor(10000 + Math.random() * 90000)}`;
         newRecord = {
           ...requestData,
           id: requestId,
@@ -473,7 +512,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch (err) {
       console.error('Error submitting pickup request:', err);
-      const requestId = `EC-2026-${Math.floor(10000 + Math.random() * 90000)}`;
+      const requestId = `RN-2026-${Math.floor(10000 + Math.random() * 90000)}`;
       newRecord = {
         ...requestData,
         id: requestId,
@@ -522,6 +561,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`Request ${id} status updated to ${status}`, 'info');
   };
 
+  const deletePickupRequest = async (id: string): Promise<boolean> => {
+    setPickupRequests((prev) => prev.filter((p) => p.id !== id));
+
+    try {
+      fetch(`/api/pickups/${id}`, { method: 'DELETE' }).catch(() => {});
+      await deletePickupFromSupabase(id);
+      showToast(`Pickup request ${id} deleted`, 'info');
+      return true;
+    } catch {
+      showToast(`Removed pickup request ${id} locally`, 'info');
+      return true;
+    }
+  };
+
   const addContactMessage = async (contactData: Omit<ContactMessage, 'id' | 'createdAt'>): Promise<ContactMessage> => {
     const contactRecord: ContactMessage = {
       ...contactData,
@@ -553,6 +606,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     showToast('Message saved to Supabase database! Our support team will respond shortly. 📩', 'success');
     return contactRecord;
+  };
+
+  const deleteContactMessage = async (id: string): Promise<boolean> => {
+    setContactMessages((prev) => prev.filter((c) => c.id !== id));
+
+    try {
+      fetch(`/api/contacts/${id}`, { method: 'DELETE' }).catch(() => {});
+      await deleteContactFromSupabase(id);
+      showToast(`Contact message ${id} removed`, 'info');
+      return true;
+    } catch {
+      showToast(`Removed message ${id} locally`, 'info');
+      return true;
+    }
   };
 
   const addSegregationRecord = (itemName: string, category: any, points: number) => {
@@ -625,8 +692,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         pickupRequests,
         addPickupRequest,
         updatePickupStatus,
+        deletePickupRequest,
         contactMessages,
         addContactMessage,
+        deleteContactMessage,
+        refreshFromSupabase,
+        isSyncingSupabase,
         segregationHistory,
         addSegregationRecord,
         awardPoints,

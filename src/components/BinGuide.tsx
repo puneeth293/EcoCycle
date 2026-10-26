@@ -41,7 +41,7 @@ export const BinGuide: React.FC = () => {
       badgeBg: 'bg-amber-100 text-amber-900 border-amber-300',
       title: 'E-Waste & Electronics',
       desc: 'Old smartphones, computer parts, charging cables, power adapters, circuit boards.',
-      doText: 'Wipe personal data. Book an EcoCycle E-Waste pickup or drop at certified recycling kiosks.'
+      doText: 'Wipe personal data. Book a Recynova E-Waste pickup or drop at certified recycling kiosks.'
     }
   ];
 
