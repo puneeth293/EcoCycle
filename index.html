@@ -3,6 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <script>
+      // Gracefully handle Vite HMR WebSocket closures in containerized dev environment
+      (function() {
+        function isWsError(e) {
+          var msg = (e && (e.message || (e.reason && (e.reason.message || e.reason)))) || '';
+          return typeof msg === 'string' && (msg.includes('WebSocket') || msg.includes('WebSocket closed without opened'));
+        }
+        window.addEventListener('error', function(e) {
+          if (isWsError(e)) {
+            if (e.preventDefault) e.preventDefault();
+            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+        window.addEventListener('unhandledrejection', function(e) {
+          if (isWsError(e)) {
+            if (e.preventDefault) e.preventDefault();
+            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+      })();
+    </script>
     <title>Recynova – Online Waste Segregation &amp; Recycling System</title>
     <meta name="description" content="A comprehensive waste and environmental management platform featuring smart waste classification, AI bot assistant powered by Gemini, photo upload for waste and pollution reporting, electricity bill payment with eco-point discounts, pickup scheduling, and collection center locator." />
     <meta property="og:title" content="Recynova – Online Waste Segregation &amp; Recycling System" />
