@@ -84,67 +84,11 @@ function getAiClient(): GoogleGenAI | null {
   return aiClient;
 }
 
-// In-memory fallback database for pickup requests in addition to client LocalStorage sync
-let pickupRequests: any[] = [
-  {
-    id: "EC-2026-00125",
-    userName: "Puneeth",
-    userEmail: "puneeth@example.com",
-    userPhone: "+91 98765 43210",
-    address: "102 Green Enclave, M.G. Road",
-    city: "Tumkur",
-    wasteType: "Recyclable Waste",
-    quantity: "15 kg",
-    preferredDate: "2026-08-10",
-    preferredTime: "10:00 AM - 01:00 PM",
-    notes: "Paper boxes and washed plastic bottles in separate bags.",
-    status: "Confirmed",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "EC-2026-00126",
-    userName: "Rahul Verma",
-    userEmail: "rahul@example.com",
-    userPhone: "+91 91234 56789",
-    address: "45 Eco Heights, Ashok Nagar",
-    city: "Tumkur",
-    wasteType: "E-Waste",
-    quantity: "8 kg",
-    preferredDate: "2026-08-11",
-    preferredTime: "02:00 PM - 05:00 PM",
-    notes: "Old computer monitors and printer cables.",
-    status: "Assigned",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "EC-2026-00127",
-    userName: "Priya Nair",
-    userEmail: "priya@example.com",
-    userPhone: "+91 99887 76655",
-    address: "12 Palm Grove, Indiranagar",
-    city: "Bengaluru",
-    wasteType: "Dry Waste",
-    quantity: "25 kg",
-    preferredDate: "2026-08-09",
-    preferredTime: "09:00 AM - 12:00 PM",
-    notes: "Cardboard packing boxes from moving.",
-    status: "Collected",
-    createdAt: new Date().toISOString(),
-  }
-];
+// In-memory pickup requests cache (synced with Supabase)
+let pickupRequests: any[] = [];
 
-// In-memory contact & support messages store
-let contactMessages: any[] = [
-  {
-    id: "CNT-2026-0001",
-    name: "Aarav Sharma",
-    email: "aarav@example.com",
-    subject: "Bulk E-Waste Pickup Enquiry",
-    message: "We have 35 outdated office PCs and UPS batteries for responsible recycling. Can we schedule an institutional pickup?",
-    status: "New",
-    createdAt: new Date().toISOString()
-  }
-];
+// In-memory contact messages cache (synced with Supabase)
+let contactMessages: any[] = [];
 
 // Health endpoint
 app.get("/api/health", (_req, res) => {

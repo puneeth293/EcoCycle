@@ -13,10 +13,12 @@ import {
   Calendar,
   MapPin,
   Clock,
-  AlertCircle
+  AlertCircle,
+  ShieldCheck,
+  ExternalLink
 } from 'lucide-react';
 import { SupabaseSyncBanner } from '../components/SupabaseSyncBanner';
-import { supabase } from '../lib/supabase';
+import { supabase, SUPABASE_CONFIG } from '../lib/supabase';
 
 export const PickupView: React.FC = () => {
   const { 
@@ -173,13 +175,13 @@ export const PickupView: React.FC = () => {
                 <Search className="w-5 h-5 text-emerald-600" />
                 <span>Track Existing Request Status</span>
               </h3>
-              <p className="text-xs text-[#365A52] font-semibold mt-0.5">Enter your Request ID (e.g. EC-2026-00125)</p>
+              <p className="text-xs text-[#365A52] font-semibold mt-0.5">Enter your Request ID (e.g. RN-2026-00125)</p>
             </div>
 
             <form onSubmit={handleTrackRequest} className="flex gap-2 w-full sm:w-auto">
               <input
                 type="text"
-                placeholder="EC-2026-XXXXX"
+                placeholder="RN-2026-XXXXX"
                 value={searchTrackerId}
                 onChange={(e) => setSearchTrackerId(e.target.value)}
                 className="px-4 py-2.5 rounded-xl bg-white border border-emerald-200 text-[#063B32] placeholder-[#365A52]/60 text-xs font-mono font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
@@ -269,13 +271,13 @@ export const PickupView: React.FC = () => {
 
             <div>
               <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-100 text-emerald-800">
-                Request Confirmation
+                Saved to Supabase Database
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-[#063B32] mt-2">
-                Your waste pickup request has been submitted successfully!
+                Your waste pickup request has been saved successfully!
               </h2>
-              <p className="text-xs font-semibold text-[#365A52] mt-1">
-                An agent will verify your pickup details and send SMS confirmation.
+              <p className="text-xs font-semibold text-[#365A52] mt-1 max-w-lg mx-auto">
+                Your details are stored in your Supabase account (<code className="font-mono font-bold text-emerald-800 bg-white px-1.5 py-0.5 rounded border border-emerald-200">pickup_requests</code> table). In accordance with your settings, records are managed in Supabase only and not displayed on the website.
               </p>
             </div>
 
@@ -283,6 +285,10 @@ export const PickupView: React.FC = () => {
               <div className="flex justify-between items-center border-b pb-2 border-emerald-100">
                 <span className="text-[#365A52] font-sans">Unique Request ID:</span>
                 <span className="font-bold text-amber-700 text-base">{submittedRecord.id}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[#365A52] font-sans">Storage Target:</span>
+                <span className="font-bold text-emerald-700">Supabase Table: pickup_requests</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-[#365A52] font-sans">Waste Category:</span>
@@ -293,7 +299,7 @@ export const PickupView: React.FC = () => {
                 <span className="font-bold">{submittedRecord.quantity}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[#365A52] font-sans">Preferred Date & Time:</span>
+                <span className="text-[#365A52] font-sans">Preferred Slot:</span>
                 <span className="font-bold">{submittedRecord.preferredDate} ({submittedRecord.preferredTime})</span>
               </div>
               <div className="flex justify-between items-center">
@@ -302,16 +308,23 @@ export const PickupView: React.FC = () => {
               </div>
             </div>
 
+            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-left flex items-start gap-2.5 text-xs text-[#365A52]">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <span>
+                <strong>Confidential Storage:</strong> This submission was written directly to your cloud Supabase database. You can inspect all raw records and export them anytime inside your <strong>Supabase Dashboard &gt; Table Editor</strong>.
+              </span>
+            </div>
+
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setSubmittedRecord(null)}
-                className="flex-1 py-3 rounded-2xl bg-[#063B32] text-white font-bold text-xs hover:bg-[#063B32]/90 transition-colors"
+                className="flex-1 py-3 rounded-2xl bg-[#063B32] text-white font-bold text-xs hover:bg-[#063B32]/90 transition-colors cursor-pointer"
               >
                 Book Another Request
               </button>
               <button
                 onClick={() => setTrackedRecord(submittedRecord)}
-                className="flex-1 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-md"
+                className="flex-1 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-md cursor-pointer"
               >
                 View Live Progress
               </button>
@@ -517,121 +530,63 @@ export const PickupView: React.FC = () => {
           </div>
         )}
 
-        {/* RECENT PICKUP REQUESTS SECTION (SUPABASE SYNCED) */}
+        {/* SUPABASE ACCOUNT STORAGE & PRIVACY PANEL */}
         <div className="mt-12 max-w-4xl mx-auto glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-100 pb-4">
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-100 text-emerald-800 text-[11px] font-black uppercase tracking-wider mb-1.5">
                 <Database className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Supabase Live Records</span>
+                <span>Supabase Account Storage Only</span>
               </div>
-              <h3 className="text-xl font-black text-[#063B32]">Your Scheduled Pickups</h3>
+              <h3 className="text-xl font-black text-[#063B32]">Database Storage & Security Notice</h3>
               <p className="text-xs text-[#365A52] font-semibold">
-                Live collection requests synchronized with Supabase database table <code className="font-mono text-emerald-800 font-bold bg-white px-1.5 py-0.5 rounded border border-emerald-200">pickup_requests</code>
+                All pickup schedule submissions are saved directly to your Supabase cloud project (<code className="font-mono text-emerald-800 font-bold bg-white px-1.5 py-0.5 rounded border border-emerald-200">{SUPABASE_CONFIG.projectId}</code>).
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => refreshFromSupabase()}
-              disabled={isSyncingSupabase}
-              className="px-4 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer self-start sm:self-auto"
+            <a
+              href={SUPABASE_CONFIG.tableEditorUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center gap-2 shadow-md transition-all self-start sm:self-auto cursor-pointer"
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${isSyncingSupabase ? 'animate-spin' : ''}`} />
-              <span>{isSyncingSupabase ? 'Refreshing...' : 'Refresh from Supabase'}</span>
-            </button>
+              <Database className="w-3.5 h-3.5" />
+              <span>Open Supabase Table Editor</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
           </div>
 
-          {pickupRequests.length === 0 ? (
-            <div className="text-center py-10 px-4 glass-subcard rounded-2xl border border-dashed border-emerald-200">
-              <Truck className="w-10 h-10 text-emerald-400 mx-auto mb-2 opacity-60" />
-              <p className="text-sm font-black text-[#063B32]">No pickup requests found</p>
-              <p className="text-xs text-[#365A52] mt-1">Book your first waste pickup above to save it to your Supabase cloud database.</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div className="glass-subcard p-4 rounded-2xl border border-emerald-100 space-y-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <h4 className="font-black text-[#063B32]">Not Shown on Website</h4>
+              <p className="text-[#365A52] font-semibold leading-relaxed">
+                Resident names, phone numbers, addresses, and schedule slots are strictly hidden from the public website to protect citizen privacy.
+              </p>
             </div>
-          ) : (
-            <div className="space-y-3.5">
-              {pickupRequests.map((req) => (
-                <div
-                  key={req.id}
-                  className="glass-subcard p-4 sm:p-5 rounded-2xl border border-emerald-100/90 hover:border-emerald-300 transition-all space-y-3"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-50 pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-black text-sm text-[#063B32]">{req.id}</span>
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        {req.status}
-                      </span>
-                    </div>
 
-                    <div className="flex items-center gap-3 text-xs text-[#365A52]">
-                      <span className="flex items-center gap-1 font-semibold">
-                        <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>{req.preferredDate}</span>
-                      </span>
-                      <span className="flex items-center gap-1 font-semibold">
-                        <Clock className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>{req.preferredTime}</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                    <div>
-                      <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px] block">Resident Name</span>
-                      <span className="font-black text-[#063B32]">{req.userName}</span>
-                      {req.userPhone && (
-                        <span className="text-[11px] text-[#365A52] block font-mono">{req.userPhone}</span>
-                      )}
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px] block">Waste Details</span>
-                      <span className="font-black text-emerald-700">{req.wasteType}</span>
-                      <span className="text-[11px] text-[#365A52] block font-semibold">Qty: {req.quantity}</span>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px] block">Location</span>
-                      <span className="font-semibold text-[#063B32] truncate block" title={req.address}>
-                        {req.address}
-                      </span>
-                      <span className="text-[11px] text-emerald-800 font-bold block">{req.city}</span>
-                    </div>
-                  </div>
-
-                  {req.notes && (
-                    <div className="text-[11px] bg-emerald-50/70 p-2 rounded-xl text-[#365A52] border border-emerald-100">
-                      <strong>Notes:</strong> {req.notes}
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setTrackedRecord(req)}
-                      className="text-xs font-black text-emerald-700 hover:text-emerald-900 flex items-center gap-1 cursor-pointer"
-                    >
-                      <Search className="w-3 h-3" />
-                      <span>Track Status</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (window.confirm(`Are you sure you want to cancel pickup request ${req.id}?`)) {
-                          deletePickupRequest(req.id);
-                        }
-                      }}
-                      className="text-xs font-bold text-rose-600 hover:text-rose-800 flex items-center gap-1 cursor-pointer px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Cancel</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
+            <div className="glass-subcard p-4 rounded-2xl border border-emerald-100 space-y-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                <Database className="w-4 h-4" />
+              </div>
+              <h4 className="font-black text-[#063B32]">Stored in Supabase Only</h4>
+              <p className="text-[#365A52] font-semibold leading-relaxed">
+                Submissions flow straight into the <code className="font-mono text-emerald-800 font-bold bg-white px-1 rounded border border-emerald-200">pickup_requests</code> PostgreSQL table in your Supabase account.
+              </p>
             </div>
-          )}
+
+            <div className="glass-subcard p-4 rounded-2xl border border-emerald-100 space-y-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                <Truck className="w-4 h-4" />
+              </div>
+              <h4 className="font-black text-[#063B32]">Dispatch Operations</h4>
+              <p className="text-[#365A52] font-semibold leading-relaxed">
+                Logistics coordinators filter, update status, and assign collection trucks directly inside the Supabase Table Editor or SQL Console.
+              </p>
+            </div>
+          </div>
         </div>
 
       </div>

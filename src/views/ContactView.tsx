@@ -6,11 +6,14 @@ import {
   CheckCircle2, 
   MessageSquare,
   Database,
-  Sparkles
+  Sparkles,
+  ShieldCheck,
+  ExternalLink
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ContactLocationDetailsCard } from '../components/ContactLocationDetailsCard';
 import { SupabaseSyncBanner } from '../components/SupabaseSyncBanner';
+import { SUPABASE_CONFIG } from '../lib/supabase';
 
 export const ContactView: React.FC = () => {
   const { addContactMessage } = useApp();
@@ -111,15 +114,25 @@ export const ContactView: React.FC = () => {
               </div>
 
               {sentSuccess ? (
-                <div className="glass-subcard p-6 rounded-2xl border border-emerald-300 text-center space-y-3">
-                  <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
-                  <h3 className="text-lg font-black text-[#063B32]">Message Delivered!</h3>
-                  <p className="text-xs text-[#365A52] font-semibold">
-                    Thank you for contacting Recynova. An environmental support representative will respond within 24 hours.
-                  </p>
+                <div className="glass-subcard p-6 rounded-2xl border border-emerald-300 text-center space-y-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto shadow-xs">
+                    <CheckCircle2 className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-[#063B32]">Message Saved to Supabase Database!</h3>
+                    <p className="text-xs text-[#365A52] font-semibold mt-1">
+                      Your inquiry has been stored securely into your Supabase account (<code className="font-mono text-emerald-800 font-bold bg-white px-1.5 py-0.5 rounded border border-emerald-200">contact_messages</code> table).
+                    </p>
+                  </div>
+                  <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-left flex items-start gap-2 text-xs text-[#365A52]">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Privacy Assurance:</strong> In line with your database configuration, user contact submissions are stored in your Supabase account only and are not displayed on this public website.
+                    </span>
+                  </div>
                   <button
                     onClick={() => setSentSuccess(false)}
-                    className="mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
+                    className="mt-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
                   >
                     Send Another Message
                   </button>

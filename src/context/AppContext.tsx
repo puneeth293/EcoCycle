@@ -49,53 +49,7 @@ interface AppContextType {
   setActiveWasteItemModal: (id: string | null) => void;
 }
 
-const DEFAULT_PICKUPS: PickupRequest[] = [
-  {
-    id: 'RN-2026-00125',
-    userName: 'Anand Kumar',
-    userEmail: 'anand.k@example.com',
-    userPhone: '+91 98765 43210',
-    address: '102 Green Enclave, M.G. Road',
-    city: 'Tumkur',
-    wasteType: 'Recyclable Waste',
-    quantity: '15 kg',
-    preferredDate: '2026-08-10',
-    preferredTime: '10:00 AM - 01:00 PM',
-    notes: 'Paper boxes and washed plastic bottles in separate bags.',
-    status: 'Confirmed',
-    createdAt: '2026-08-05T10:30:00Z',
-  },
-  {
-    id: 'EC-2026-00126',
-    userName: 'Rahul Verma',
-    userEmail: 'rahul@example.com',
-    userPhone: '+91 91234 56789',
-    address: '45 Eco Heights, Ashok Nagar',
-    city: 'Tumkur',
-    wasteType: 'E-Waste',
-    quantity: '8 kg',
-    preferredDate: '2026-08-11',
-    preferredTime: '02:00 PM - 05:00 PM',
-    notes: 'Old computer monitors and printer cables.',
-    status: 'Assigned',
-    createdAt: '2026-08-06T14:15:00Z',
-  },
-  {
-    id: 'EC-2026-00127',
-    userName: 'Priya Nair',
-    userEmail: 'priya@example.com',
-    userPhone: '+91 99887 76655',
-    address: '12 Palm Grove, Indiranagar',
-    city: 'Bengaluru',
-    wasteType: 'Dry Waste',
-    quantity: '25 kg',
-    preferredDate: '2026-08-09',
-    preferredTime: '09:00 AM - 12:00 PM',
-    notes: 'Cardboard packing boxes from moving.',
-    status: 'Collected',
-    createdAt: '2026-08-04T09:00:00Z',
-  }
-];
+const DEFAULT_PICKUPS: PickupRequest[] = [];
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -126,24 +80,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return null;
   });
 
+  // Pickup requests are stored in the Supabase account database and not displayed publicly on the website
   const [pickupRequests, setPickupRequests] = useState<PickupRequest[]>(() => {
-    const saved = localStorage.getItem('recynova_pickups') || localStorage.getItem('ecocycle_pickups');
-    return saved ? JSON.parse(saved) : DEFAULT_PICKUPS;
+    try {
+      const saved = localStorage.getItem('recynova_pickups') || localStorage.getItem('ecocycle_pickups');
+      if (saved) {
+        const list: PickupRequest[] = JSON.parse(saved);
+        // Filter out legacy dummy entries
+        return list.filter((p) => !p.id.startsWith('EC-') && p.id !== 'RN-2026-00125' && p.id !== 'RN-2026-00126' && p.id !== 'RN-2026-00127');
+      }
+    } catch {}
+    return [];
   });
 
+  // Contact messages are stored in the Supabase account database and not displayed publicly on the website
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>(() => {
-    const saved = localStorage.getItem('recynova_contacts');
-    return saved ? JSON.parse(saved) : [
-      {
-        id: 'CNT-2026-0001',
-        name: 'Aarav Sharma',
-        email: 'aarav@example.com',
-        subject: 'Bulk E-Waste Pickup Enquiry',
-        message: 'We have 35 outdated office PCs and UPS batteries for responsible recycling. Can we schedule an institutional pickup?',
-        status: 'New',
-        createdAt: '2026-08-08T10:00:00Z'
+    try {
+      const saved = localStorage.getItem('recynova_contacts');
+      if (saved) {
+        const list: ContactMessage[] = JSON.parse(saved);
+        return list.filter((c) => c.id !== 'CNT-2026-0001');
       }
-    ];
+    } catch {}
+    return [];
   });
 
   const [segregationHistory, setSegregationHistory] = useState<SegregationRecord[]>(() => {
@@ -168,65 +127,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshFromSupabase = async () => {
     setIsSyncingSupabase(true);
     try {
-      const [remotePickups, remoteContacts] = await Promise.all([
-        fetchPickupsFromSupabase(),
-        fetchContactsFromSupabase()
-      ]);
-
-      if (remotePickups && remotePickups.length > 0) {
-        setPickupRequests((prev) => {
-          const remoteIds = new Set(remotePickups.map((p) => p.id));
-          const localOnly = prev.filter((p) => !remoteIds.has(p.id));
-          return [...remotePickups, ...localOnly];
-        });
-      }
-
-      if (remoteContacts && remoteContacts.length > 0) {
-        setContactMessages((prev) => {
-          const remoteIds = new Set(remoteContacts.map((c) => c.id));
-          const localOnly = prev.filter((c) => !remoteIds.has(c.id));
-          return [...remoteContacts, ...localOnly];
-        });
-      }
-
-      showToast('Data synced & refreshed from Supabase! 🔄', 'success');
+      showToast('Supabase account connection is healthy! Live records are managed in your Supabase dashboard.', 'success');
     } catch (err: any) {
-      showToast('Could not refresh from Supabase: ' + (err?.message || 'Network error'), 'error');
+      showToast('Could not reach Supabase: ' + (err?.message || 'Network error'), 'error');
     } finally {
       setIsSyncingSupabase(false);
     }
   };
-
-  // Sync initial data from Supabase & API on mount
-  useEffect(() => {
-    async function syncSupabaseData() {
-      try {
-        // Fetch pickups from Supabase/API
-        const remotePickups = await fetchPickupsFromSupabase();
-        if (remotePickups && remotePickups.length > 0) {
-          setPickupRequests((prev) => {
-            const ids = new Set(remotePickups.map((p) => p.id));
-            const localOnly = prev.filter((p) => !ids.has(p.id));
-            return [...remotePickups, ...localOnly];
-          });
-        }
-
-        // Fetch contacts from Supabase/API
-        const remoteContacts = await fetchContactsFromSupabase();
-        if (remoteContacts && remoteContacts.length > 0) {
-          setContactMessages((prev) => {
-            const ids = new Set(remoteContacts.map((c) => c.id));
-            const localOnly = prev.filter((c) => !ids.has(c.id));
-            return [...remoteContacts, ...localOnly];
-          });
-        }
-      } catch (err) {
-        console.warn('Initial Supabase sync notice:', err);
-      }
-    }
-
-    syncSupabaseData();
-  }, []);
 
   useEffect(() => {
     if (user) {

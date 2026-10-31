@@ -110,29 +110,19 @@ export const SupabaseSyncBanner: React.FC<SupabaseSyncBannerProps> = ({ pageType
           <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
           <Database className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>
-            Supabase Live Sync Active &bull; Storing in project <code className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-200">{SUPABASE_CONFIG.projectId}</code>
+            Supabase Account Storage Active &bull; Storing in project <code className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-200">{SUPABASE_CONFIG.projectId}</code> (Private &bull; Not displayed on website)
           </span>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={handleVerifyAndSync}
-            disabled={syncing}
-            className="px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-100/70 text-emerald-900 border border-emerald-300 font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-            <span>{syncing ? 'Syncing...' : 'Sync All Data Now'}</span>
-          </button>
-
           <a
             href={SUPABASE_CONFIG.tableEditorUrl}
             target="_blank"
             rel="noreferrer"
-            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all flex items-center gap-1 shadow-xs"
+            className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
           >
-            <span>View in Supabase</span>
-            <ExternalLink className="w-3 h-3" />
+            <span>Open in Supabase</span>
+            <ExternalLink className="w-3.5 h-3.5" />
           </a>
         </div>
       </div>
