@@ -5,20 +5,18 @@ import {
   HelpCircle, 
   CheckCircle2, 
   MessageSquare,
-  Database,
   Sparkles,
   ShieldCheck,
-  ExternalLink
+  Phone
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ContactLocationDetailsCard } from '../components/ContactLocationDetailsCard';
-import { SupabaseSyncBanner } from '../components/SupabaseSyncBanner';
-import { SUPABASE_CONFIG } from '../lib/supabase';
 
 export const ContactView: React.FC = () => {
-  const { addContactMessage } = useApp();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const { user, addContactMessage } = useApp();
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [phone, setPhone] = useState(user?.phone || '');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,11 +49,12 @@ export const ContactView: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (name && email && message) {
+    if (name && email && phone && message) {
       setIsSubmitting(true);
       await addContactMessage({
         name,
         email,
+        phone,
         subject: subject || 'General Support Inquiry',
         message
       });
@@ -63,6 +62,7 @@ export const ContactView: React.FC = () => {
       setSentSuccess(true);
       setName('');
       setEmail('');
+      setPhone('');
       setSubject('');
       setMessage('');
     }
@@ -87,9 +87,6 @@ export const ContactView: React.FC = () => {
           </p>
         </div>
 
-        {/* Supabase Storage & Tables Status Banner */}
-        <SupabaseSyncBanner pageType="contact" />
-
         {/* Contact Info + Form Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
@@ -102,15 +99,11 @@ export const ContactView: React.FC = () => {
           <div className="lg:col-span-6">
             <div className="glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl">
               
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-6">
+              <div className="mb-6">
                 <h2 className="text-xl font-black text-[#063B32] flex items-center gap-2">
                   <MessageSquare className="w-5 h-5 text-emerald-600" />
                   <span>Send Us a Message</span>
                 </h2>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[10px] font-bold text-emerald-800">
-                  <Database className="w-3 h-3 text-emerald-600" />
-                  <span>Supabase Storage Active</span>
-                </div>
               </div>
 
               {sentSuccess ? (
@@ -169,17 +162,34 @@ export const ContactView: React.FC = () => {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-black text-[#063B32] mb-1">
-                      Subject
-                    </label>
-                    <input
-                      type="text"
-                      value={subject}
-                      onChange={(e) => setSubject(e.target.value)}
-                      placeholder="e.g. Bulk Society Recycling Query"
-                      className="w-full px-4 py-2.5 rounded-xl bg-white border border-emerald-200 text-[#063B32] text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-[#063B32] mb-1 flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Phone Number *</span>
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="+91 98765 43210"
+                        className="w-full px-4 py-2.5 rounded-xl bg-white border border-emerald-200 text-[#063B32] text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-black text-[#063B32] mb-1">
+                        Subject
+                      </label>
+                      <input
+                        type="text"
+                        value={subject}
+                        onChange={(e) => setSubject(e.target.value)}
+                        placeholder="e.g. Bulk Society Recycling Query"
+                        className="w-full px-4 py-2.5 rounded-xl bg-white border border-emerald-200 text-[#063B32] text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -202,7 +212,7 @@ export const ContactView: React.FC = () => {
                     className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2 shadow-emerald-600/25 cursor-pointer"
                   >
                     <Send className={`w-4 h-4 ${isSubmitting ? 'animate-spin' : ''}`} />
-                    <span>{isSubmitting ? 'Saving to Supabase Database...' : 'Send Message & Save to Supabase'}</span>
+                    <span>{isSubmitting ? 'Sending Message...' : 'Send Message'}</span>
                   </button>
                 </form>
               )}

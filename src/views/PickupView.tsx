@@ -7,18 +7,13 @@ import {
   Package, 
   CheckCircle2, 
   Search,
-  Database,
-  RefreshCw,
-  Trash2,
   Calendar,
   MapPin,
   Clock,
   AlertCircle,
-  ShieldCheck,
-  ExternalLink
+  ShieldCheck
 } from 'lucide-react';
-import { SupabaseSyncBanner } from '../components/SupabaseSyncBanner';
-import { supabase, SUPABASE_CONFIG } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 
 export const PickupView: React.FC = () => {
   const { 
@@ -257,11 +252,6 @@ export const PickupView: React.FC = () => {
           )}
         </div>
 
-        {/* Supabase Realtime Storage & Tables Status Banner */}
-        <div className="max-w-4xl mx-auto">
-          <SupabaseSyncBanner pageType="pickup" />
-        </div>
-
         {/* Confirmation Card after Submission */}
         {submittedRecord ? (
           <div className="glass-panel rounded-3xl p-8 shadow-2xl max-w-2xl mx-auto text-center space-y-6 animate-in zoom-in-95 duration-300 border-2 border-emerald-400">
@@ -336,15 +326,11 @@ export const PickupView: React.FC = () => {
             
             <form onSubmit={handleSubmit} className="space-y-6">
               
-              <div className="border-b border-emerald-100 pb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+              <div className="border-b border-emerald-100 pb-4">
                 <h3 className="text-lg font-black text-[#063B32] flex items-center gap-2">
                   <User className="w-5 h-5 text-emerald-600" />
                   <span>Contact & Location Details</span>
                 </h3>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-[10px] font-bold text-emerald-800 shadow-2xs">
-                  <Database className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Supabase Live Sync (Project: zkuongbbsshtpsasdbun)</span>
-                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -514,12 +500,12 @@ export const PickupView: React.FC = () => {
                   {submitting ? (
                     <span className="flex items-center gap-2">
                       <Truck className="w-5 h-5 animate-bounce" />
-                      <span>Saving Pickup Details to Supabase Database...</span>
+                      <span>Scheduling Doorstep Pickup...</span>
                     </span>
                   ) : (
                     <>
                       <Truck className="w-5 h-5" />
-                      <span>Schedule Pickup & Save to Supabase (+30 Eco Points)</span>
+                      <span>Schedule Doorstep Pickup (+30 Eco Points)</span>
                     </>
                   )}
                 </button>
@@ -530,64 +516,7 @@ export const PickupView: React.FC = () => {
           </div>
         )}
 
-        {/* SUPABASE ACCOUNT STORAGE & PRIVACY PANEL */}
-        <div className="mt-12 max-w-4xl mx-auto glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-100 pb-4">
-            <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-100 text-emerald-800 text-[11px] font-black uppercase tracking-wider mb-1.5">
-                <Database className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Supabase Account Storage Only</span>
-              </div>
-              <h3 className="text-xl font-black text-[#063B32]">Database Storage & Security Notice</h3>
-              <p className="text-xs text-[#365A52] font-semibold">
-                All pickup schedule submissions are saved directly to your Supabase cloud project (<code className="font-mono text-emerald-800 font-bold bg-white px-1.5 py-0.5 rounded border border-emerald-200">{SUPABASE_CONFIG.projectId}</code>).
-              </p>
-            </div>
 
-            <a
-              href={SUPABASE_CONFIG.tableEditorUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center gap-2 shadow-md transition-all self-start sm:self-auto cursor-pointer"
-            >
-              <Database className="w-3.5 h-3.5" />
-              <span>Open Supabase Table Editor</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-            <div className="glass-subcard p-4 rounded-2xl border border-emerald-100 space-y-2">
-              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-                <ShieldCheck className="w-4 h-4" />
-              </div>
-              <h4 className="font-black text-[#063B32]">Not Shown on Website</h4>
-              <p className="text-[#365A52] font-semibold leading-relaxed">
-                Resident names, phone numbers, addresses, and schedule slots are strictly hidden from the public website to protect citizen privacy.
-              </p>
-            </div>
-
-            <div className="glass-subcard p-4 rounded-2xl border border-emerald-100 space-y-2">
-              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-                <Database className="w-4 h-4" />
-              </div>
-              <h4 className="font-black text-[#063B32]">Stored in Supabase Only</h4>
-              <p className="text-[#365A52] font-semibold leading-relaxed">
-                Submissions flow straight into the <code className="font-mono text-emerald-800 font-bold bg-white px-1 rounded border border-emerald-200">pickup_requests</code> PostgreSQL table in your Supabase account.
-              </p>
-            </div>
-
-            <div className="glass-subcard p-4 rounded-2xl border border-emerald-100 space-y-2">
-              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-                <Truck className="w-4 h-4" />
-              </div>
-              <h4 className="font-black text-[#063B32]">Dispatch Operations</h4>
-              <p className="text-[#365A52] font-semibold leading-relaxed">
-                Logistics coordinators filter, update status, and assign collection trucks directly inside the Supabase Table Editor or SQL Console.
-              </p>
-            </div>
-          </div>
-        </div>
 
       </div>
     </div>

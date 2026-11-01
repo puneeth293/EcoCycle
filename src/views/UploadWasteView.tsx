@@ -1245,7 +1245,8 @@ export const UploadWasteView: React.FC = () => {
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Options hidden per user request */}
+            <div className="hidden flex-wrap items-center gap-2">
               {/* Filter buttons */}
               <div className="flex flex-wrap gap-1.5">
                 <button

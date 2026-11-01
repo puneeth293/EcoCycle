@@ -502,9 +502,14 @@ export const ContactLocationDetailsCard: React.FC<ContactLocationDetailsCardProp
               <Phone className="w-5 h-5" />
             </div>
             <div className="flex-1">
-              <strong className="block text-[#063B32] font-black text-sm">
-                Toll-Free Helpline & Dispatch:
-              </strong>
+              <div className="flex items-center justify-between gap-2">
+                <strong className="block text-[#063B32] font-black text-sm">
+                  Toll-Free Helpline & Dispatch:
+                </strong>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  24/7 Toll-Free
+                </span>
+              </div>
               <p className="text-xs text-[#365A52] font-semibold mt-0.5">
                 1800-123-RECYNOVA • (+91 80 2345 6789)
               </p>
