@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   Award, 
@@ -10,15 +10,17 @@ import {
   BarChart2, 
   Upload, 
   Zap,
-  Database,
-  ShieldCheck,
-  ExternalLink
+  Sparkles,
+  Check,
+  Flame,
+  Droplets,
+  ArrowRight,
+  Gift
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
-import { SUPABASE_CONFIG } from '../lib/supabase';
 
 export const DashboardView: React.FC = () => {
-  const { user, pickupRequests, segregationHistory, navigate } = useApp();
+  const { user, pickupRequests, segregationHistory, navigate, awardPoints, showToast } = useApp();
 
   const userPickups = pickupRequests.filter(
     (p) => p.userName.toLowerCase() === (user?.name || '').toLowerCase() || user?.role === 'admin'
@@ -43,6 +45,88 @@ export const DashboardView: React.FC = () => {
     { month: 'Jul', kg: 15 },
     { month: 'Aug', kg: wasteSegregatedKg },
   ];
+
+  // Weekly Green Quests State
+  const [completedQuests, setCompletedQuests] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('recynova_weekly_quests');
+      return saved ? JSON.parse(saved) : { q1: true, q2: true, q3: false, q4: false };
+    } catch {
+      return { q1: true, q2: true, q3: false, q4: false };
+    }
+  });
+
+  const [bonusClaimed, setBonusClaimed] = useState<boolean>(() => {
+    return localStorage.getItem('recynova_weekly_bonus_claimed') === 'true';
+  });
+
+  const quests = [
+    {
+      id: 'q1',
+      title: 'Segregate Kitchen Wet Waste',
+      desc: 'Sort peelings, vegetable trimmings & tea leaves into Green Bin',
+      points: 25,
+      bin: 'Green Bin 🟢',
+      badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      actionPage: 'segregation' as const,
+      actionLabel: 'Learn Sorting'
+    },
+    {
+      id: 'q2',
+      title: 'Clean Recyclable Plastics',
+      desc: 'Rinse & flatten 5 PET bottles or cartons for Blue Bin processing',
+      points: 30,
+      bin: 'Blue Bin 🔵',
+      badgeClass: 'bg-blue-100 text-blue-800 border-blue-200',
+      actionPage: 'upload-waste' as const,
+      actionLabel: 'Verify Photo'
+    },
+    {
+      id: 'q3',
+      title: 'Schedule E-Waste Doorstep Pickup',
+      desc: 'Hand over obsolete cables, chargers or electronics safely',
+      points: 40,
+      bin: 'Yellow Bin 🟡',
+      badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+      actionPage: 'pickup' as const,
+      actionLabel: 'Book Truck'
+    },
+    {
+      id: 'q4',
+      title: 'Redeem Eco Points for Bill Rebate',
+      desc: 'Claim cash discount on your state electricity bill payment',
+      points: 50,
+      bin: 'Utility Perks ⚡',
+      badgeClass: 'bg-purple-100 text-purple-800 border-purple-200',
+      actionPage: 'electricity-bill' as const,
+      actionLabel: 'Pay Bill'
+    }
+  ];
+
+  const completedCount = Object.values(completedQuests).filter(Boolean).length;
+  const isAllComplete = completedCount === quests.length;
+  const progressPercent = Math.round((completedCount / quests.length) * 100);
+
+  const toggleQuest = (id: string, points: number, title: string) => {
+    setCompletedQuests((prev) => {
+      const willBeComplete = !prev[id];
+      const next = { ...prev, [id]: willBeComplete };
+      localStorage.setItem('recynova_weekly_quests', JSON.stringify(next));
+      if (willBeComplete) {
+        awardPoints(points, `Completed quest: ${title}`);
+        showToast(`Quest completed! +${points} Eco Points awarded 🌱`, 'success');
+      }
+      return next;
+    });
+  };
+
+  const handleClaimWeeklyBonus = () => {
+    if (bonusClaimed) return;
+    awardPoints(50, 'Claimed Weekly Green Champion Bonus');
+    setBonusClaimed(true);
+    localStorage.setItem('recynova_weekly_bonus_claimed', 'true');
+    showToast('🏆 Weekly Green Champion Bonus Unlocked! +50 Eco Points', 'success');
+  };
 
   return (
     <div className="py-12 relative z-10 min-h-screen">
@@ -222,67 +306,141 @@ export const DashboardView: React.FC = () => {
 
         </div>
 
-        {/* Supabase Cloud Data Protection & Storage Notice */}
+        {/* Weekly Sustainability Quests & Eco Rewards Hub */}
         <div className="glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl mb-10">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-100 pb-5 mb-5">
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-100 text-emerald-800 text-[11px] font-black uppercase tracking-wider mb-2">
-                <Database className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Supabase Private Cloud Storage</span>
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Weekly Green Quests & Eco Rewards</span>
               </div>
               <h3 className="text-xl font-black text-[#063B32]">
-                Database Records & Privacy Protection
+                Household Sustainability Milestones
               </h3>
               <p className="text-xs font-semibold text-[#365A52] mt-0.5">
-                All pickup schedule submissions are stored securely in your Supabase database (<code className="font-mono text-emerald-800 font-bold bg-white px-1.5 py-0.5 rounded border border-emerald-200">{SUPABASE_CONFIG.projectId}</code>).
+                Complete weekly diversion targets to earn verified bonus Eco Points and unlock utility cash rebates.
               </p>
             </div>
 
-            <div className="flex items-center gap-2.5">
-              <button
-                onClick={() => navigate('pickup')}
-                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Book Pickup</span>
-              </button>
+            <div className="flex items-center gap-3">
+              <div className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-black flex items-center gap-1.5 shadow-2xs">
+                <Flame className="w-4 h-4 text-amber-600 animate-pulse" />
+                <span>5-Day Green Streak</span>
+              </div>
 
-              <a
-                href={SUPABASE_CONFIG.tableEditorUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="px-4 py-2.5 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 font-black text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
-              >
-                <Database className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Supabase Table Editor</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+              <div className="text-right">
+                <span className="text-[11px] font-bold text-[#365A52] block">Weekly Progress</span>
+                <span className="text-sm font-black text-emerald-800 font-mono">
+                  {completedCount} / {quests.length} Completed ({progressPercent}%)
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div className="glass-subcard p-4 rounded-2xl border border-emerald-100 flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-emerald-100 text-emerald-700 shrink-0 mt-0.5">
-                <ShieldCheck className="w-5 h-5" />
+          {/* Progress Bar */}
+          <div className="w-full bg-emerald-100/70 h-2.5 rounded-full overflow-hidden mb-6">
+            <div
+              className="bg-emerald-600 h-full transition-all duration-500 rounded-full"
+              style={{ width: `${progressPercent}%` }}
+            ></div>
+          </div>
+
+          {/* Quests Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {quests.map((q) => {
+              const done = !!completedQuests[q.id];
+              return (
+                <div
+                  key={q.id}
+                  className={`p-4 rounded-2xl border transition-all duration-200 flex items-start gap-3.5 ${
+                    done
+                      ? 'bg-emerald-50/70 border-emerald-300 shadow-2xs'
+                      : 'bg-white/80 border-emerald-100 hover:border-emerald-300 shadow-xs'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleQuest(q.id, q.points, q.title)}
+                    className={`mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
+                      done
+                        ? 'bg-emerald-600 text-white'
+                        : 'border-2 border-emerald-300 hover:border-emerald-500 bg-white'
+                    }`}
+                    title={done ? 'Mark as incomplete' : 'Mark as completed'}
+                  >
+                    {done && <Check className="w-4 h-4 stroke-[3]" />}
+                  </button>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${q.badgeClass}`}>
+                        {q.bin}
+                      </span>
+                      <span className="text-xs font-black font-mono text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md">
+                        +{q.points} Pts
+                      </span>
+                    </div>
+
+                    <h4 className={`text-sm font-black ${done ? 'line-through text-emerald-900/60' : 'text-[#063B32]'}`}>
+                      {q.title}
+                    </h4>
+                    <p className="text-xs text-[#365A52] font-semibold mt-0.5 leading-relaxed">
+                      {q.desc}
+                    </p>
+
+                    <div className="mt-2.5 flex items-center gap-2">
+                      <button
+                        onClick={() => navigate(q.actionPage)}
+                        className="text-[11px] font-black text-emerald-700 hover:text-emerald-900 inline-flex items-center gap-1 hover:underline cursor-pointer"
+                      >
+                        <span>{q.actionLabel}</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Bottom Eco Impact & Weekly Bonus Card */}
+          <div className="pt-4 border-t border-emerald-100 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-[#063B32]">
+              <div className="flex items-center gap-1.5 bg-white/70 px-3 py-1.5 rounded-xl border border-emerald-100 shadow-2xs">
+                <TreePine className="w-4 h-4 text-emerald-600" />
+                <span><strong>{Math.max(1, Number((wasteSegregatedKg * 0.18).toFixed(1)))}</strong> Trees Supported</span>
               </div>
-              <div>
-                <h4 className="font-black text-[#063B32] text-sm">Customer Data Kept Private</h4>
-                <p className="text-[#365A52] font-semibold mt-1 leading-relaxed">
-                  Per system confidentiality configuration, personal customer submissions (addresses, contact details, and custom notes) are stored in your private Supabase database and are not displayed on this website.
-                </p>
+              <div className="flex items-center gap-1.5 bg-white/70 px-3 py-1.5 rounded-xl border border-emerald-100 shadow-2xs">
+                <Droplets className="w-4 h-4 text-sky-600" />
+                <span><strong>{Math.round(wasteSegregatedKg * 42)}L</strong> Water Saved</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-white/70 px-3 py-1.5 rounded-xl border border-emerald-100 shadow-2xs">
+                <Zap className="w-4 h-4 text-amber-500" />
+                <span><strong>{Math.round(wasteSegregatedKg * 3.6)} kWh</strong> Clean Power</span>
               </div>
             </div>
 
-            <div className="glass-subcard p-4 rounded-2xl border border-emerald-100 flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-emerald-100 text-emerald-700 shrink-0 mt-0.5">
-                <Database className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-black text-[#063B32] text-sm">Single Source of Truth in Supabase</h4>
-                <p className="text-[#365A52] font-semibold mt-1 leading-relaxed">
-                  All door-to-door collection requests and resident inquiries are securely written to the <code className="font-mono text-emerald-800 font-bold bg-white px-1 rounded border border-emerald-200">pickup_requests</code> and <code className="font-mono text-emerald-800 font-bold bg-white px-1 rounded border border-emerald-200">contact_messages</code> tables.
-                </p>
-              </div>
+            <div>
+              {bonusClaimed ? (
+                <div className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-800 font-black text-xs flex items-center gap-2 border border-emerald-200">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Weekly Bonus Claimed (+50 Pts)</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!isAllComplete}
+                  onClick={handleClaimWeeklyBonus}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 transition-all ${
+                    isAllComplete
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md transform hover:scale-[1.02] cursor-pointer'
+                      : 'bg-emerald-100/60 text-emerald-900/50 cursor-not-allowed border border-emerald-200/60'
+                  }`}
+                >
+                  <Gift className="w-4 h-4" />
+                  <span>Claim Weekly Champion Bonus (+50 Pts)</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

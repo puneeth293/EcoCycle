@@ -107,25 +107,30 @@ export const ContactView: React.FC = () => {
               </div>
 
               {sentSuccess ? (
-                <div className="glass-subcard p-6 rounded-2xl border border-emerald-300 text-center space-y-3.5">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto shadow-xs">
-                    <CheckCircle2 className="w-7 h-7" />
+                <div className="glass-subcard p-6 sm:p-8 rounded-2xl border border-emerald-300 text-center space-y-4 animate-in zoom-in-95 duration-200">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto shadow-sm border border-emerald-200">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-600" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-black text-[#063B32]">Message Saved to Supabase Database!</h3>
-                    <p className="text-xs text-[#365A52] font-semibold mt-1">
-                      Your inquiry has been stored securely into your Supabase account (<code className="font-mono text-emerald-800 font-bold bg-white px-1.5 py-0.5 rounded border border-emerald-200">contact_messages</code> table).
+                    <span className="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800">
+                      Message Sent
+                    </span>
+                    <h3 className="text-xl font-black text-[#063B32] mt-2">
+                      Thank you! Your message has been sent successfully.
+                    </h3>
+                    <p className="text-xs text-[#365A52] font-semibold mt-1.5 max-w-md mx-auto leading-relaxed">
+                      Our customer support and waste segregation coordination team has received your message and will get back to you shortly.
                     </p>
                   </div>
-                  <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-left flex items-start gap-2 text-xs text-[#365A52]">
+                  <div className="p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 text-left flex items-start gap-2.5 text-xs text-[#365A52]">
                     <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <span>
-                      <strong>Privacy Assurance:</strong> In line with your database configuration, user contact submissions are stored in your Supabase account only and are not displayed on this public website.
+                      <strong>Priority Helpline:</strong> For urgent pickup scheduling or immediate assistance, you can also reach our dispatch desk toll-free at <strong>1800-123-RECYNOVA</strong>.
                     </span>
                   </div>
                   <button
                     onClick={() => setSentSuccess(false)}
-                    className="mt-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
+                    className="mt-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
                   >
                     Send Another Message
                   </button>

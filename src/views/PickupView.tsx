@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { supabase } from '../lib/supabase';
 import { WasteCategoryType, PickupRequest } from '../types';
 import { 
   Truck, 
@@ -13,17 +14,12 @@ import {
   AlertCircle,
   ShieldCheck
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 
 export const PickupView: React.FC = () => {
   const { 
     user, 
     pickupRequests, 
-    addPickupRequest, 
-    deletePickupRequest, 
-    refreshFromSupabase, 
-    isSyncingSupabase,
-    showToast 
+    addPickupRequest
   } = useApp();
 
   // Form states
@@ -83,56 +79,65 @@ export const PickupView: React.FC = () => {
       return;
     }
 
-    // 2. Direct Supabase query fallback for requests from other devices
+    // 2. Local backend query + direct Supabase lookup fallback
     setIsSearchingRemote(true);
     try {
+      const response = await fetch('/api/pickups').catch(() => null);
+      if (response && response.ok) {
+        const remoteList: PickupRequest[] = await response.json();
+        const remoteMatch = remoteList.find((p) => p.id?.toUpperCase() === idToSearch);
+        if (remoteMatch) {
+          setTrackedRecord(remoteMatch);
+          setTrackerError(false);
+          return;
+        }
+      }
+
       const { data, error } = await supabase
         .from('pickup_requests')
         .select('*')
         .ilike('id', idToSearch)
         .limit(1);
 
-      if (!error && data && data.length > 0) {
-        const row = data[0];
-        let reqEmail = row.user_email || row.userEmail || row.email || '';
-        let reqNotes = row.notes || '';
-        if (!reqEmail && reqNotes && reqNotes.includes('[Email: ')) {
-          const match = reqNotes.match(/\[Email:\s*([^\]]+)\]/);
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const row: any = data[0];
+        let rowEmail = row.user_email || row.userEmail || row.email || '';
+        let rowNotes = row.notes || '';
+        if (!rowEmail && rowNotes && rowNotes.includes('[Email: ')) {
+          const match = rowNotes.match(/\[Email:\s*([^\]]+)\]/);
           if (match) {
-            reqEmail = match[1].trim();
-            reqNotes = reqNotes.replace(/\[Email:\s*[^\]]+\]\s*/, '').trim();
+            rowEmail = match[1].trim();
+            rowNotes = rowNotes.replace(/\[Email:\s*[^\]]+\]\s*/, '').trim();
           }
         }
-
-        let reqAddress = row.address || '';
-        let reqCity = row.city || '';
-        if (!reqCity && reqAddress.includes(',')) {
-          const parts = reqAddress.split(',');
-          reqCity = parts[parts.length - 1].trim();
+        const addressStr = row.address || '';
+        let cityStr = row.city || '';
+        if (!cityStr && addressStr.includes(',')) {
+          const parts = addressStr.split(',');
+          cityStr = parts[parts.length - 1].trim();
         }
 
-        const remoteRecord: PickupRequest = {
+        setTrackedRecord({
           id: row.id,
           userName: row.name || row.user_name || row.userName || 'Resident',
-          userEmail: reqEmail,
+          userEmail: rowEmail,
           userPhone: row.phone || row.user_phone || row.userPhone || '',
-          address: reqAddress,
-          city: reqCity || 'Tumkur',
+          address: addressStr,
+          city: cityStr || 'Tumkur',
           wasteType: row.waste_type || row.wasteType || 'Recyclable Waste',
           quantity: row.weight || row.quantity || '10 kg',
           preferredDate: row.preferred_date || row.preferredDate || '',
           preferredTime: row.preferred_time || row.preferredTime || '',
-          notes: reqNotes,
-          status: (row.status as any) || 'Pending',
+          notes: rowNotes,
+          status: row.status || 'Pending',
           createdAt: row.created_at || row.createdAt || new Date().toISOString(),
-        };
-
-        setTrackedRecord(remoteRecord);
+        });
         setTrackerError(false);
-      } else {
-        setTrackedRecord(null);
-        setTrackerError(true);
+        return;
       }
+
+      setTrackedRecord(null);
+      setTrackerError(true);
     } catch {
       setTrackedRecord(null);
       setTrackerError(true);
@@ -183,9 +188,10 @@ export const PickupView: React.FC = () => {
               />
               <button
                 type="submit"
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shrink-0 transition-colors shadow-md"
+                disabled={isSearchingRemote}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-black text-xs shrink-0 transition-colors shadow-md cursor-pointer"
               >
-                Track Request
+                {isSearchingRemote ? 'Searching...' : 'Track Request'}
               </button>
             </form>
           </div>
@@ -261,13 +267,13 @@ export const PickupView: React.FC = () => {
 
             <div>
               <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-100 text-emerald-800">
-                Saved to Supabase Database
+                Pickup Scheduled Successfully
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-[#063B32] mt-2">
-                Your waste pickup request has been saved successfully!
+                Your waste pickup request has been booked!
               </h2>
               <p className="text-xs font-semibold text-[#365A52] mt-1 max-w-lg mx-auto">
-                Your details are stored in your Supabase account (<code className="font-mono font-bold text-emerald-800 bg-white px-1.5 py-0.5 rounded border border-emerald-200">pickup_requests</code> table). In accordance with your settings, records are managed in Supabase only and not displayed on the website.
+                Our logistics coordinators have queued your doorstep collection. A collection truck will arrive at your specified address during the scheduled slot.
               </p>
             </div>
 
@@ -277,8 +283,8 @@ export const PickupView: React.FC = () => {
                 <span className="font-bold text-amber-700 text-base">{submittedRecord.id}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[#365A52] font-sans">Storage Target:</span>
-                <span className="font-bold text-emerald-700">Supabase Table: pickup_requests</span>
+                <span className="text-[#365A52] font-sans">Collection Slot:</span>
+                <span className="font-bold text-emerald-700">{submittedRecord.preferredDate} ({submittedRecord.preferredTime})</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-[#365A52] font-sans">Waste Category:</span>
@@ -289,11 +295,11 @@ export const PickupView: React.FC = () => {
                 <span className="font-bold">{submittedRecord.quantity}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[#365A52] font-sans">Preferred Slot:</span>
-                <span className="font-bold">{submittedRecord.preferredDate} ({submittedRecord.preferredTime})</span>
+                <span className="text-[#365A52] font-sans">Destination Facility:</span>
+                <span className="font-bold">{submittedRecord.city} Central Depot</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[#365A52] font-sans">Status:</span>
+                <span className="text-[#365A52] font-sans">Booking Status:</span>
                 <span className="font-bold text-emerald-700">{submittedRecord.status}</span>
               </div>
             </div>
@@ -301,7 +307,7 @@ export const PickupView: React.FC = () => {
             <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-left flex items-start gap-2.5 text-xs text-[#365A52]">
               <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <span>
-                <strong>Confidential Storage:</strong> This submission was written directly to your cloud Supabase database. You can inspect all raw records and export them anytime inside your <strong>Supabase Dashboard &gt; Table Editor</strong>.
+                <strong>Doorstep Collection Protocol:</strong> Please keep your segregated waste bags ready at your doorstep 15 minutes before the arrival window.
               </span>
             </div>
 

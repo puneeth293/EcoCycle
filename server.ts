@@ -1,4 +1,5 @@
 import express from "express";
+import fs from "fs";
 import path from "path";
 import compression from "compression";
 import { createServer as createViteServer } from "vite";
@@ -9,9 +10,9 @@ import dotenv from "dotenv";
 dotenv.config();
 
 // Supabase Configuration
-const SUPABASE_PROJECT_ID = process.env.SUPABASE_PROJECT_ID || "zkuongbbsshtpsasdbun";
-const SUPABASE_URL = process.env.SUPABASE_URL || "https://zkuongbbsshtpsasdbun.supabase.co";
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "sb_publishable_MQFwrOt666FXPWnB9Sdc2A_oj5dhofP";
+const SUPABASE_PROJECT_ID = process.env.SUPABASE_PROJECT_ID || "angabwovocwptexemdvd";
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://angabwovocwptexemdvd.supabase.co";
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "sb_publishable_AqDD9m56dOjBXBuJ-kZ21A_2aUCx8NV";
 
 let supabase: SupabaseClient | null = null;
 try {
@@ -84,11 +85,50 @@ function getAiClient(): GoogleGenAI | null {
   return aiClient;
 }
 
-// In-memory pickup requests cache (synced with Supabase)
-let pickupRequests: any[] = [];
+// Local file-backed persistence & cache for waste reports, pickup requests, and contact messages
+const LOCAL_DB_DIR = path.join(process.cwd(), "workspace");
+const LOCAL_DB_FILE = path.join(LOCAL_DB_DIR, "local-db.json");
 
-// In-memory contact messages cache (synced with Supabase)
+let wasteReports: any[] = [];
+let pickupRequests: any[] = [];
 let contactMessages: any[] = [];
+
+function loadLocalDb() {
+  try {
+    if (fs.existsSync(LOCAL_DB_FILE)) {
+      const raw = fs.readFileSync(LOCAL_DB_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.wasteReports)) {
+        wasteReports = parsed.wasteReports;
+      }
+      if (Array.isArray(parsed.pickupRequests)) {
+        pickupRequests = parsed.pickupRequests;
+      }
+      if (Array.isArray(parsed.contactMessages)) {
+        contactMessages = parsed.contactMessages;
+      }
+    }
+  } catch (err) {
+    console.warn("[LocalDB] Failed to load local database file:", err);
+  }
+}
+
+function saveLocalDb() {
+  try {
+    if (!fs.existsSync(LOCAL_DB_DIR)) {
+      fs.mkdirSync(LOCAL_DB_DIR, { recursive: true });
+    }
+    fs.writeFileSync(
+      LOCAL_DB_FILE,
+      JSON.stringify({ wasteReports, pickupRequests, contactMessages }, null, 2),
+      "utf-8"
+    );
+  } catch (err) {
+    console.warn("[LocalDB] Failed to save local database file:", err);
+  }
+}
+
+loadLocalDb();
 
 // Health endpoint
 app.get("/api/health", (_req, res) => {
@@ -981,8 +1021,15 @@ app.get("/api/electricity/transactions", (_req, res) => {
 });
 
 // ==========================================
-// SUPABASE-INTEGRATED PICKUP REQUESTS API
+// SUPABASE-INTEGRATED WASTE & POLLUTION REPORTS API
 // ==========================================
+const WASTE_REPORT_TABLE_CANDIDATES = [
+  'waste_reports',
+  'environmental_reports',
+  'waste_pollution_reports',
+  'reports'
+];
+
 const PICKUP_TABLE_CANDIDATES = [
   'pickup_requests',
   'pickuprequests',
@@ -1001,6 +1048,176 @@ const CONTACT_TABLE_CANDIDATES = [
   'contact'
 ];
 
+app.get("/api/waste-reports", async (_req, res) => {
+  if (supabase) {
+    for (const tableName of WASTE_REPORT_TABLE_CANDIDATES) {
+      try {
+        const { data, error } = await supabase
+          .from(tableName)
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!error && Array.isArray(data)) {
+          const mapped = data.map((row: any) => ({
+            id: row.id,
+            reportType: row.report_type || row.reportType || 'waste',
+            imageUrl: row.image_url || row.imageUrl || '',
+            detectedTitle: row.detected_title || row.detectedTitle || 'Waste Report',
+            categoryOrDomain: row.category_or_domain || row.categoryOrDomain || 'Recyclable Waste',
+            binColor: row.bin_color || row.binColor || undefined,
+            binName: row.bin_name || row.binName || undefined,
+            confidenceScore: row.confidence_score ?? row.confidenceScore ?? 95,
+            severityLevel: row.severity_level || row.severityLevel || 'Low',
+            sourceOfPollution: row.source_of_pollution || row.sourceOfPollution || undefined,
+            aqiImpact: row.aqi_impact || row.aqiImpact || undefined,
+            contaminantsIdentified: Array.isArray(row.contaminants_identified) ? row.contaminants_identified : undefined,
+            conditionNotes: row.condition_notes || row.conditionNotes || '',
+            actionSteps: Array.isArray(row.action_steps) ? row.action_steps : [],
+            remedialAdvice: row.remedial_advice || row.remedialAdvice || '',
+            pointsAwarded: row.points_awarded ?? row.pointsAwarded ?? 0,
+            co2SavedKg: row.co2_saved_kg !== null && row.co2_saved_kg !== undefined ? Number(row.co2_saved_kg) : undefined,
+            ticketId: row.ticket_id || row.ticketId || undefined,
+            timestamp: row.created_at ? String(row.created_at).split('T')[0] : new Date().toISOString().split('T')[0],
+            location: row.location || undefined
+          }));
+          wasteReports = mapped;
+          return res.json(mapped);
+        }
+      } catch (err) {
+        console.warn(`[Supabase] GET /api/waste-reports check on '${tableName}':`, err);
+      }
+    }
+  }
+  res.json(wasteReports);
+});
+
+app.post("/api/waste-reports", async (req, res) => {
+  const report = req.body;
+  if (!report || !report.detectedTitle) {
+    return res.status(400).json({ error: "Report details are required" });
+  }
+
+  const recordId = report.id || `rep-${Date.now()}`;
+  const fullRecord = {
+    ...report,
+    id: recordId,
+    timestamp: report.timestamp || new Date().toISOString().split('T')[0],
+  };
+
+  wasteReports.unshift(fullRecord);
+  saveLocalDb();
+
+  let supabaseSaved = false;
+  let savedTable: string | null = null;
+  let supabaseError: string | null = null;
+
+  if (supabase) {
+    const standardPayload = {
+      id: fullRecord.id,
+      report_type: fullRecord.reportType || 'waste',
+      detected_title: fullRecord.detectedTitle,
+      category_or_domain: fullRecord.categoryOrDomain || 'Recyclable Waste',
+      bin_color: fullRecord.binColor || null,
+      bin_name: fullRecord.binName || null,
+      confidence_score: fullRecord.confidenceScore ?? 95,
+      severity_level: fullRecord.severityLevel || 'Low',
+      source_of_pollution: fullRecord.sourceOfPollution || null,
+      aqi_impact: fullRecord.aqiImpact || null,
+      contaminants_identified: fullRecord.contaminantsIdentified || [],
+      condition_notes: fullRecord.conditionNotes || '',
+      action_steps: fullRecord.actionSteps || [],
+      remedial_advice: fullRecord.remedialAdvice || '',
+      points_awarded: fullRecord.pointsAwarded ?? 0,
+      co2_saved_kg: fullRecord.co2SavedKg ?? null,
+      ticket_id: fullRecord.ticketId || null,
+      location: fullRecord.location || null,
+      user_note: fullRecord.userNote || null,
+      user_name: fullRecord.userName || null,
+      user_email: fullRecord.userEmail || null,
+      image_url: fullRecord.imageUrl || null,
+      created_at: new Date().toISOString()
+    };
+
+    const minimalPayload = {
+      id: fullRecord.id,
+      report_type: fullRecord.reportType || 'waste',
+      detected_title: fullRecord.detectedTitle,
+      category_or_domain: fullRecord.categoryOrDomain || 'Recyclable Waste',
+      bin_color: fullRecord.binColor || null,
+      bin_name: fullRecord.binName || null,
+      confidence_score: fullRecord.confidenceScore ?? 95,
+      severity_level: fullRecord.severityLevel || 'Low',
+      condition_notes: fullRecord.conditionNotes || '',
+      remedial_advice: fullRecord.remedialAdvice || '',
+      points_awarded: fullRecord.pointsAwarded ?? 0,
+      ticket_id: fullRecord.ticketId || null,
+      location: fullRecord.location || null,
+      image_url: fullRecord.imageUrl || null,
+      created_at: new Date().toISOString()
+    };
+
+    for (const tableName of WASTE_REPORT_TABLE_CANDIDATES) {
+      try {
+        const { error: stdErr } = await supabase
+          .from(tableName)
+          .upsert(standardPayload, { onConflict: 'id' });
+
+        if (!stdErr) {
+          supabaseSaved = true;
+          savedTable = tableName;
+          console.log(`[Supabase] Waste report saved to '${tableName}': ${fullRecord.id}`);
+          break;
+        }
+
+        if (stdErr.code === 'PGRST205') {
+          continue;
+        }
+
+        const { error: minErr } = await supabase
+          .from(tableName)
+          .upsert(minimalPayload, { onConflict: 'id' });
+
+        if (!minErr) {
+          supabaseSaved = true;
+          savedTable = tableName;
+          break;
+        }
+
+        supabaseError = stdErr.message || minErr.message;
+      } catch (err: any) {
+        supabaseError = err?.message;
+      }
+    }
+  }
+
+  res.status(201).json({
+    ...fullRecord,
+    supabaseSaved,
+    savedTable,
+    supabaseError: supabaseSaved ? null : (supabaseError || "Table 'waste_reports' not found in Supabase")
+  });
+});
+
+app.delete("/api/waste-reports/:id", async (req, res) => {
+  const { id } = req.params;
+  wasteReports = wasteReports.filter((r) => r.id !== id);
+  saveLocalDb();
+
+  if (supabase) {
+    for (const tableName of WASTE_REPORT_TABLE_CANDIDATES) {
+      try {
+        const { error } = await supabase.from(tableName).delete().eq('id', id);
+        if (!error) break;
+      } catch {}
+    }
+  }
+
+  return res.json({ success: true, id });
+});
+
+// ==========================================
+// SUPABASE-INTEGRATED PICKUP REQUESTS API
+// ==========================================
 app.get("/api/pickups", async (_req, res) => {
   if (supabase) {
     for (const tableName of PICKUP_TABLE_CANDIDATES) {
@@ -1046,7 +1263,6 @@ app.get("/api/pickups", async (_req, res) => {
             };
           });
 
-          // Sync to in-memory cache
           pickupRequests = mapped;
           return res.json(mapped);
         }
@@ -1068,10 +1284,9 @@ app.post("/api/pickups", async (req, res) => {
     createdAt: newPickup.createdAt || new Date().toISOString(),
   };
 
-  // 1. Keep in memory for instant local availability
   pickupRequests.unshift(fullRecord);
+  saveLocalDb();
 
-  // 2. Persist to Supabase pickup table
   let supabaseSaved = false;
   let savedTable: string | null = null;
   let supabaseError: string | null = null;
@@ -1086,7 +1301,22 @@ app.post("/api/pickups", async (req, res) => {
       ? `${emailNoteTag} ${fullRecord.notes || ''}`.trim()
       : (fullRecord.notes || '');
 
-    // Standard payload matching existing Supabase schema
+    const fullPayload = {
+      id: fullRecord.id,
+      name: fullRecord.userName || 'Resident',
+      email: fullRecord.userEmail || '',
+      phone: fullRecord.userPhone || '',
+      address: formattedAddress || '',
+      city: fullRecord.city || '',
+      waste_type: fullRecord.wasteType || 'Recyclable Waste',
+      weight: fullRecord.quantity || '10 kg',
+      preferred_date: fullRecord.preferredDate || '',
+      preferred_time: fullRecord.preferredTime || '',
+      notes: fullRecord.notes || '',
+      status: fullRecord.status || 'Pending',
+      created_at: fullRecord.createdAt
+    };
+
     const standardPayload = {
       id: fullRecord.id,
       name: fullRecord.userName || 'Resident',
@@ -1101,37 +1331,23 @@ app.post("/api/pickups", async (req, res) => {
       created_at: fullRecord.createdAt
     };
 
-    // Extended snake_case payload
-    const extendedPayload = {
-      ...standardPayload,
-      user_name: fullRecord.userName || '',
-      user_email: fullRecord.userEmail || '',
-      email: fullRecord.userEmail || '',
-      user_phone: fullRecord.userPhone || '',
-      city: fullRecord.city || '',
-      quantity: fullRecord.quantity || '',
-    };
-
-    // CamelCase payload
-    const camelPayload = {
-      id: fullRecord.id,
-      userName: fullRecord.userName,
-      userEmail: fullRecord.userEmail,
-      userPhone: fullRecord.userPhone,
-      address: fullRecord.address,
-      city: fullRecord.city,
-      wasteType: fullRecord.wasteType,
-      quantity: fullRecord.quantity,
-      preferredDate: fullRecord.preferredDate,
-      preferredTime: fullRecord.preferredTime,
-      notes: fullRecord.notes || '',
-      status: fullRecord.status || 'Pending',
-      createdAt: fullRecord.createdAt
-    };
-
     for (const tableName of PICKUP_TABLE_CANDIDATES) {
       try {
-        // 1. Try standard payload
+        const { error: fullErr } = await supabase
+          .from(tableName)
+          .upsert(fullPayload, { onConflict: 'id' });
+
+        if (!fullErr) {
+          supabaseSaved = true;
+          savedTable = tableName;
+          console.log(`[Supabase] Pickup saved to '${tableName}': ${fullRecord.id}`);
+          break;
+        }
+
+        if (fullErr.code === 'PGRST205') {
+          continue;
+        }
+
         const { error: stdErr } = await supabase
           .from(tableName)
           .upsert(standardPayload, { onConflict: 'id' });
@@ -1142,33 +1358,7 @@ app.post("/api/pickups", async (req, res) => {
           break;
         }
 
-        if (stdErr.code === 'PGRST205') {
-          continue;
-        }
-
-        // 2. Try extended payload
-        const { error: extErr } = await supabase
-          .from(tableName)
-          .upsert(extendedPayload, { onConflict: 'id' });
-
-        if (!extErr) {
-          supabaseSaved = true;
-          savedTable = tableName;
-          break;
-        }
-
-        // 3. Try camelCase payload
-        const { error: camelErr } = await supabase
-          .from(tableName)
-          .upsert(camelPayload, { onConflict: 'id' });
-
-        if (!camelErr) {
-          supabaseSaved = true;
-          savedTable = tableName;
-          break;
-        }
-
-        supabaseError = stdErr.message || extErr.message || camelErr.message;
+        supabaseError = fullErr.message || stdErr.message;
       } catch (err: any) {
         supabaseError = err?.message;
       }
@@ -1189,6 +1379,7 @@ app.put("/api/pickups/:id/status", async (req, res) => {
   const index = pickupRequests.findIndex((p) => p.id === id);
   if (index !== -1) {
     pickupRequests[index].status = status;
+    saveLocalDb();
   }
 
   if (supabase) {
@@ -1209,6 +1400,7 @@ app.put("/api/pickups/:id/status", async (req, res) => {
 app.delete("/api/pickups/:id", async (req, res) => {
   const { id } = req.params;
   pickupRequests = pickupRequests.filter((p) => p.id !== id);
+  saveLocalDb();
 
   if (supabase) {
     for (const tableName of PICKUP_TABLE_CANDIDATES) {
@@ -1242,7 +1434,7 @@ app.get("/api/contacts", async (_req, res) => {
             phone: r.phone || '',
             subject: r.subject || '',
             message: r.message || '',
-            status: r.status || 'Received',
+            status: r.status || 'New',
             createdAt: r.created_at || r.createdAt || new Date().toISOString()
           }));
           contactMessages = mapped;
@@ -1255,29 +1447,41 @@ app.get("/api/contacts", async (_req, res) => {
 });
 
 app.post("/api/contacts", async (req, res) => {
-  const { name, email, phone, subject, message } = req.body;
+  const { id, name, email, phone, subject, message, status, createdAt } = req.body;
   if (!name || !email || !message) {
     return res.status(400).json({ error: "Name, email, and message are required" });
   }
 
   const contactRecord = {
-    id: `CNT-${Date.now()}`,
+    id: id || `CNT-${Date.now()}`,
     name,
     email,
-    phone: phone || '',
+    phone: phone || "",
     subject: subject || "Support & Service Inquiry",
     message,
-    status: "New",
-    createdAt: new Date().toISOString()
+    status: status || "New",
+    createdAt: createdAt || new Date().toISOString()
   };
 
   contactMessages.unshift(contactRecord);
+  saveLocalDb();
 
   let supabaseSaved = false;
   let savedTable: string | null = null;
   let supabaseError: string | null = null;
 
   if (supabase) {
+    const extendedPayload = {
+      id: contactRecord.id,
+      name: contactRecord.name,
+      email: contactRecord.email,
+      phone: contactRecord.phone || null,
+      subject: contactRecord.subject,
+      message: contactRecord.message,
+      status: contactRecord.status,
+      created_at: contactRecord.createdAt
+    };
+
     const standardPayload = {
       id: contactRecord.id,
       name: contactRecord.name,
@@ -1288,36 +1492,28 @@ app.post("/api/contacts", async (req, res) => {
       created_at: contactRecord.createdAt
     };
 
-    const extendedPayload = {
-      ...standardPayload,
-      status: contactRecord.status,
-    };
-
     for (const tableName of CONTACT_TABLE_CANDIDATES) {
       try {
-        // 1. Try standard payload
-        const { error: stdErr } = await supabase.from(tableName).upsert(standardPayload, { onConflict: 'id' });
-        if (!stdErr) {
-          supabaseSaved = true;
-          savedTable = tableName;
-          console.log(`[Supabase] Contact saved to '${tableName}' (standard): ${contactRecord.id}`);
-          break;
-        }
-
-        if (stdErr.code === 'PGRST205') {
-          continue;
-        }
-
-        // 2. Try extended payload with status
         const { error: extErr } = await supabase.from(tableName).upsert(extendedPayload, { onConflict: 'id' });
         if (!extErr) {
           supabaseSaved = true;
           savedTable = tableName;
-          console.log(`[Supabase] Contact saved to '${tableName}' (extended): ${contactRecord.id}`);
+          console.log(`[Supabase] Contact saved to '${tableName}': ${contactRecord.id}`);
           break;
         }
 
-        supabaseError = stdErr.message || extErr.message;
+        if (extErr.code === 'PGRST205') {
+          continue;
+        }
+
+        const { error: stdErr } = await supabase.from(tableName).upsert(standardPayload, { onConflict: 'id' });
+        if (!stdErr) {
+          supabaseSaved = true;
+          savedTable = tableName;
+          break;
+        }
+
+        supabaseError = extErr.message || stdErr.message;
       } catch (err: any) {
         supabaseError = err?.message;
       }
@@ -1326,8 +1522,8 @@ app.post("/api/contacts", async (req, res) => {
 
   res.status(201).json({
     success: true,
-    message: supabaseSaved 
-      ? `Contact message saved to Supabase table '${savedTable}'!` 
+    message: supabaseSaved
+      ? `Contact message saved to Supabase table '${savedTable}'!`
       : "Message saved locally.",
     record: contactRecord,
     supabaseSaved,
@@ -1339,6 +1535,7 @@ app.post("/api/contacts", async (req, res) => {
 app.delete("/api/contacts/:id", async (req, res) => {
   const { id } = req.params;
   contactMessages = contactMessages.filter((c) => c.id !== id);
+  saveLocalDb();
 
   if (supabase) {
     for (const tableName of CONTACT_TABLE_CANDIDATES) {
@@ -1354,34 +1551,58 @@ app.delete("/api/contacts/:id", async (req, res) => {
 
 // Bulk sync endpoint to sync all local data to Supabase
 app.post("/api/supabase/sync-all", async (req, res) => {
-  const { pickups = [], contacts = [] } = req.body;
+  const { wasteReports: incomingReports = [], pickups = [], contacts = [] } = req.body;
+  let syncedWasteReports = 0;
   let syncedPickups = 0;
   let syncedContacts = 0;
-  let pickupError: string | null = null;
-  let contactError: string | null = null;
 
   if (supabase) {
-    // 1. Sync pickups
+    for (const r of incomingReports) {
+      const payload = {
+        id: r.id,
+        report_type: r.reportType || 'waste',
+        detected_title: r.detectedTitle,
+        category_or_domain: r.categoryOrDomain || 'Recyclable Waste',
+        bin_color: r.binColor || null,
+        bin_name: r.binName || null,
+        confidence_score: r.confidenceScore ?? 95,
+        severity_level: r.severityLevel || 'Low',
+        condition_notes: r.conditionNotes || '',
+        action_steps: r.actionSteps || [],
+        remedial_advice: r.remedialAdvice || '',
+        points_awarded: r.pointsAwarded ?? 0,
+        co2_saved_kg: r.co2SavedKg ?? null,
+        ticket_id: r.ticketId || null,
+        location: r.location || null,
+        image_url: r.imageUrl || null,
+        created_at: new Date().toISOString()
+      };
+      for (const tableName of WASTE_REPORT_TABLE_CANDIDATES) {
+        const { error } = await supabase.from(tableName).upsert(payload, { onConflict: 'id' });
+        if (!error) {
+          syncedWasteReports++;
+          break;
+        }
+      }
+    }
+
     for (const p of pickups) {
       const formattedAddress = p.city && !p.address.toLowerCase().includes(p.city.toLowerCase())
         ? `${p.address}, ${p.city}`
         : p.address;
 
-      const emailNoteTag = p.userEmail ? `[Email: ${p.userEmail}]` : '';
-      const formattedNotes = emailNoteTag
-        ? `${emailNoteTag} ${p.notes || ''}`.trim()
-        : (p.notes || '');
-
       const payload = {
         id: p.id,
         name: p.userName || 'Resident',
+        email: p.userEmail || '',
         phone: p.userPhone || '',
         address: formattedAddress || '',
+        city: p.city || '',
         waste_type: p.wasteType || 'Recyclable Waste',
         weight: p.quantity || '10 kg',
         preferred_date: p.preferredDate || '',
         preferred_time: p.preferredTime || '',
-        notes: formattedNotes,
+        notes: p.notes || '',
         status: p.status || 'Pending',
         created_at: p.createdAt || new Date().toISOString()
       };
@@ -1391,13 +1612,10 @@ app.post("/api/supabase/sync-all", async (req, res) => {
         if (!error) {
           syncedPickups++;
           break;
-        } else {
-          pickupError = error.message;
         }
       }
     }
 
-    // 2. Sync contacts
     for (const c of contacts) {
       const payload = {
         id: c.id,
@@ -1406,6 +1624,7 @@ app.post("/api/supabase/sync-all", async (req, res) => {
         phone: c.phone || null,
         subject: c.subject || '',
         message: c.message || '',
+        status: c.status || 'New',
         created_at: c.createdAt || new Date().toISOString()
       };
 
@@ -1414,27 +1633,24 @@ app.post("/api/supabase/sync-all", async (req, res) => {
         if (!error) {
           syncedContacts++;
           break;
-        } else {
-          contactError = error.message;
         }
       }
     }
   }
 
   res.json({
-    success: syncedPickups > 0 || syncedContacts > 0,
+    success: syncedWasteReports > 0 || syncedPickups > 0 || syncedContacts > 0,
+    syncedWasteReports,
     syncedPickups,
-    syncedContacts,
-    pickupError,
-    contactError
+    syncedContacts
   });
 });
 
-// ==========================================
-// SUPABASE CONNECTION STATUS & SCHEMA INFO
-// ==========================================
+// Supabase connection status & schema info
 app.get("/api/supabase/status", async (_req, res) => {
   let connected = false;
+  let wasteReportTableReady = false;
+  let activeWasteReportTable: string | null = null;
   let pickupTableReady = false;
   let activePickupTable: string | null = null;
   let contactTableReady = false;
@@ -1445,7 +1661,15 @@ app.get("/api/supabase/status", async (_req, res) => {
     try {
       connected = true;
 
-      // Check pickups across candidates
+      for (const table of WASTE_REPORT_TABLE_CANDIDATES) {
+        const { error } = await supabase.from(table).select('id').limit(1);
+        if (!error) {
+          wasteReportTableReady = true;
+          activeWasteReportTable = table;
+          break;
+        }
+      }
+
       for (const table of PICKUP_TABLE_CANDIDATES) {
         const { error } = await supabase.from(table).select('id').limit(1);
         if (!error) {
@@ -1455,7 +1679,6 @@ app.get("/api/supabase/status", async (_req, res) => {
         }
       }
 
-      // Check contacts across candidates
       for (const table of CONTACT_TABLE_CANDIDATES) {
         const { error } = await supabase.from(table).select('id').limit(1);
         if (!error) {
@@ -1473,6 +1696,8 @@ app.get("/api/supabase/status", async (_req, res) => {
     projectId: SUPABASE_PROJECT_ID,
     url: SUPABASE_URL,
     connected,
+    wasteReportTableReady,
+    activeWasteReportTable,
     pickupTableReady,
     activePickupTable,
     contactTableReady,

@@ -1,14 +1,23 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { PageRoute, UserProfile, PickupRequest, SegregationRecord, ContactMessage } from '../types';
-import { INITIAL_WASTE_ITEMS } from '../data/wasteData';
-import { 
-  savePickupToSupabase, 
-  updatePickupStatusInSupabase, 
-  saveContactToSupabase, 
-  fetchPickupsFromSupabase, 
-  fetchContactsFromSupabase,
+import {
+  PageRoute,
+  UserProfile,
+  PickupRequest,
+  SegregationRecord,
+  ContactMessage,
+  EnvironmentalReportRecord
+} from '../types';
+import {
+  saveWasteReportToSupabase,
+  deleteWasteReportFromSupabase,
+  fetchWasteReportsFromSupabase,
+  savePickupToSupabase,
+  updatePickupStatusInSupabase,
   deletePickupFromSupabase,
-  deleteContactFromSupabase
+  fetchPickupsFromSupabase,
+  saveContactToSupabase,
+  deleteContactFromSupabase,
+  fetchContactsFromSupabase
 } from '../lib/supabase';
 
 interface ToastState {
@@ -27,6 +36,13 @@ interface AppContextType {
   login: (email: string, passwordOrRole?: string) => boolean;
   register: (name: string, email: string, password?: string, phone?: string) => boolean;
   logoutUser: () => void;
+  environmentalReports: EnvironmentalReportRecord[];
+  addEnvironmentalReport: (
+    report: EnvironmentalReportRecord,
+    metadata?: { userNote?: string; userName?: string; userEmail?: string }
+  ) => Promise<EnvironmentalReportRecord>;
+  deleteEnvironmentalReport: (id: string) => Promise<boolean>;
+  clearEnvironmentalReports: () => Promise<void>;
   pickupRequests: PickupRequest[];
   addPickupRequest: (requestData: Omit<PickupRequest, 'id' | 'status' | 'createdAt'>) => Promise<PickupRequest>;
   updatePickupStatus: (id: string, status: PickupRequest['status']) => void;
@@ -34,8 +50,6 @@ interface AppContextType {
   contactMessages: ContactMessage[];
   addContactMessage: (contactData: Omit<ContactMessage, 'id' | 'createdAt'>) => Promise<ContactMessage>;
   deleteContactMessage: (id: string) => Promise<boolean>;
-  refreshFromSupabase: () => Promise<void>;
-  isSyncingSupabase: boolean;
   segregationHistory: SegregationRecord[];
   addSegregationRecord: (itemName: string, category: any, points: number) => void;
   awardPoints: (points: number, reason: string) => void;
@@ -80,7 +94,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return null;
   });
 
-  // Pickup requests are stored in the Supabase account database and not displayed publicly on the website
+  // Environmental & Waste reports stored locally, via backend API, and Supabase
+  const [environmentalReports, setEnvironmentalReports] = useState<EnvironmentalReportRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('recynova_environmental_reports') || localStorage.getItem('ecocycle_environmental_reports');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch {}
+    return [
+      {
+        id: 'rep-01',
+        reportType: 'waste',
+        imageUrl: 'https://images.unsplash.com/photo-1527011046414-4781f1f94f8c?w=600&auto=format&fit=crop&q=80',
+        detectedTitle: 'Crushed PET Water Bottle',
+        categoryOrDomain: 'Recyclable Waste',
+        binColor: 'Blue',
+        binName: 'Blue Bin 🔵',
+        confidenceScore: 98,
+        severityLevel: 'Low',
+        conditionNotes: 'Rinsed clean and flattened properly.',
+        actionSteps: ['Rinsed residue', 'Crushed flat', 'Placed in Blue Bin'],
+        remedialAdvice: 'Converted into recycled polyester fibers for eco-clothing.',
+        pointsAwarded: 40,
+        co2SavedKg: 0.65,
+        timestamp: '2026-08-14'
+      },
+      {
+        id: 'rep-02',
+        reportType: 'air-pollution',
+        imageUrl: 'https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=600&auto=format&fit=crop&q=80',
+        detectedTitle: 'Industrial Chimney Heavy Smoke Plume',
+        categoryOrDomain: 'Air Pollution',
+        confidenceScore: 96,
+        severityLevel: 'Severe',
+        sourceOfPollution: 'Unfiltered furnace chimney combustion',
+        aqiImpact: 'Estimated AQI Spike: 290 (Very Unhealthy)',
+        contaminantsIdentified: ['PM2.5', 'Sulfur Dioxide (SO2)', 'Carbon Monoxide'],
+        conditionNotes: 'Dense soot plume reported near residential zone.',
+        actionSteps: ['Wear N95 protective mask', 'Seal windows', 'CPCB grievance filed'],
+        remedialAdvice: 'Wet scrubber installation mandatory under Clean Air regulations.',
+        pointsAwarded: 60,
+        co2SavedKg: 2.10,
+        ticketId: 'CPCB-AIR-88219',
+        timestamp: '2026-08-15'
+      }
+    ];
+  });
+
+  // Pickup requests stored locally, via backend API, and Supabase
   const [pickupRequests, setPickupRequests] = useState<PickupRequest[]>(() => {
     try {
       const saved = localStorage.getItem('recynova_pickups') || localStorage.getItem('ecocycle_pickups');
@@ -93,7 +155,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return [];
   });
 
-  // Contact messages are stored in the Supabase account database and not displayed publicly on the website
+  // Contact messages stored locally, via backend API, and Supabase
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>(() => {
     try {
       const saved = localStorage.getItem('recynova_contacts');
@@ -122,18 +184,86 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [selectedSearchItem, setSelectedSearchItem] = useState<string>('');
   const [activeWasteItemModal, setActiveWasteItemModal] = useState<string | null>(null);
-  const [isSyncingSupabase, setIsSyncingSupabase] = useState<boolean>(false);
 
-  const refreshFromSupabase = async () => {
-    setIsSyncingSupabase(true);
-    try {
-      showToast('Supabase account connection is healthy! Live records are managed in your Supabase dashboard.', 'success');
-    } catch (err: any) {
-      showToast('Could not reach Supabase: ' + (err?.message || 'Network error'), 'error');
-    } finally {
-      setIsSyncingSupabase(false);
-    }
-  };
+  // Sync from Express backend API and Supabase on mount
+  useEffect(() => {
+    const loadRemoteData = async () => {
+      try {
+        const [reportsRes, pickupsRes, contactsRes] = await Promise.all([
+          fetch('/api/waste-reports').catch(() => null),
+          fetch('/api/pickups').catch(() => null),
+          fetch('/api/contacts').catch(() => null)
+        ]);
+
+        let remoteReports: EnvironmentalReportRecord[] | null = null;
+        if (reportsRes && reportsRes.ok) {
+          const parsed = await reportsRes.json();
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            remoteReports = parsed;
+          }
+        }
+        if (!remoteReports || remoteReports.length === 0) {
+          remoteReports = await fetchWasteReportsFromSupabase();
+        }
+        if (Array.isArray(remoteReports) && remoteReports.length > 0) {
+          setEnvironmentalReports((prev) => {
+            const map = new Map<string, EnvironmentalReportRecord>();
+            remoteReports!.forEach((r) => map.set(r.id, r));
+            prev.forEach((r) => {
+              if (!map.has(r.id)) map.set(r.id, r);
+            });
+            return Array.from(map.values());
+          });
+        }
+
+        let remotePickups: PickupRequest[] | null = null;
+        if (pickupsRes && pickupsRes.ok) {
+          const parsed = await pickupsRes.json();
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            remotePickups = parsed;
+          }
+        }
+        if (!remotePickups || remotePickups.length === 0) {
+          remotePickups = await fetchPickupsFromSupabase();
+        }
+        if (Array.isArray(remotePickups) && remotePickups.length > 0) {
+          setPickupRequests((prev) => {
+            const map = new Map<string, PickupRequest>();
+            remotePickups!.forEach((p) => map.set(p.id, p));
+            prev.forEach((p) => {
+              if (!map.has(p.id)) map.set(p.id, p);
+            });
+            return Array.from(map.values());
+          });
+        }
+
+        let remoteContacts: ContactMessage[] | null = null;
+        if (contactsRes && contactsRes.ok) {
+          const parsed = await contactsRes.json();
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            remoteContacts = parsed;
+          }
+        }
+        if (!remoteContacts || remoteContacts.length === 0) {
+          remoteContacts = await fetchContactsFromSupabase();
+        }
+        if (Array.isArray(remoteContacts) && remoteContacts.length > 0) {
+          setContactMessages((prev) => {
+            const map = new Map<string, ContactMessage>();
+            remoteContacts!.forEach((c) => map.set(c.id, c));
+            prev.forEach((c) => {
+              if (!map.has(c.id)) map.set(c.id, c);
+            });
+            return Array.from(map.values());
+          });
+        }
+      } catch {
+        // Offline or server unavailable; localStorage remains active
+      }
+    };
+
+    loadRemoteData();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -158,6 +288,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.removeItem('ecocycle_user');
     }
   }, [user]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('recynova_environmental_reports', JSON.stringify(environmentalReports));
+      localStorage.setItem('ecocycle_environmental_reports', JSON.stringify(environmentalReports));
+    } catch {}
+  }, [environmentalReports]);
 
   useEffect(() => {
     localStorage.setItem('recynova_pickups', JSON.stringify(pickupRequests));
@@ -395,11 +532,78 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     navigate('home');
   };
 
-  const addPickupRequest = async (requestData: Omit<PickupRequest, 'id' | 'status' | 'createdAt'>): Promise<PickupRequest> => {
-    let newRecord: PickupRequest;
+  const addEnvironmentalReport = async (
+    report: EnvironmentalReportRecord,
+    metadata?: { userNote?: string; userName?: string; userEmail?: string }
+  ): Promise<EnvironmentalReportRecord> => {
+    const payload = {
+      ...report,
+      userNote: metadata?.userNote || '',
+      userName: metadata?.userName || user?.name || '',
+      userEmail: metadata?.userEmail || user?.email || '',
+    };
+
+    setEnvironmentalReports((prev) => [report, ...prev]);
 
     try {
-      // 1. Call backend API endpoint (which handles server-side Supabase persistence)
+      const response = await fetch('/api/waste-reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const saved = await response.json();
+        if (!saved?.supabaseSaved) {
+          await saveWasteReportToSupabase(payload);
+        }
+      } else {
+        await saveWasteReportToSupabase(payload);
+      }
+    } catch {
+      await saveWasteReportToSupabase(payload);
+    }
+
+    return report;
+  };
+
+  const deleteEnvironmentalReport = async (id: string): Promise<boolean> => {
+    setEnvironmentalReports((prev) => prev.filter((item) => item.id !== id));
+
+    try {
+      await Promise.allSettled([
+        fetch(`/api/waste-reports/${id}`, { method: 'DELETE' }),
+        deleteWasteReportFromSupabase(id)
+      ]);
+      showToast('Photo report deleted from history', 'info');
+      return true;
+    } catch {
+      showToast('Photo report deleted from history', 'info');
+      return true;
+    }
+  };
+
+  const clearEnvironmentalReports = async (): Promise<void> => {
+    const ids = environmentalReports.map((r) => r.id);
+    setEnvironmentalReports([]);
+    try {
+      localStorage.setItem('recynova_environmental_reports', '[]');
+      localStorage.setItem('ecocycle_environmental_reports', '[]');
+      await Promise.allSettled(
+        ids.flatMap((id) => [
+          fetch(`/api/waste-reports/${id}`, { method: 'DELETE' }),
+          deleteWasteReportFromSupabase(id)
+        ])
+      );
+    } catch {}
+    showToast('All photo reports deleted', 'info');
+  };
+
+  const addPickupRequest = async (requestData: Omit<PickupRequest, 'id' | 'status' | 'createdAt'>): Promise<PickupRequest> => {
+    let newRecord: PickupRequest;
+    let alreadySyncedToSupabase = false;
+
+    try {
       const response = await fetch('/api/pickups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -407,7 +611,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
 
       if (response.ok) {
-        newRecord = await response.json();
+        const serverData = await response.json();
+        alreadySyncedToSupabase = Boolean(serverData?.supabaseSaved);
+        newRecord = serverData;
       } else {
         const requestId = `RN-2026-${Math.floor(10000 + Math.random() * 90000)}`;
         newRecord = {
@@ -428,14 +634,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
 
-    // 2. Direct client-side Supabase persistence backup
-    try {
-      await savePickupToSupabase(newRecord);
-    } catch (supaErr) {
-      console.warn('Client Supabase pickup sync notice:', supaErr);
+    if (!alreadySyncedToSupabase) {
+      savePickupToSupabase(newRecord).catch(() => {});
     }
 
-    // 3. Update state & rewards
+    // Update state & rewards
     setPickupRequests((prev) => [newRecord, ...prev]);
 
     if (user) {
@@ -446,7 +649,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }) : null);
     }
 
-    showToast(`Pickup Request Saved to Database! ID: ${newRecord.id} (+30 Eco Points)`, 'success');
+    showToast(`Pickup Request Booked! Tracking ID: ${newRecord.id} (+30 Eco Points)`, 'success');
     return newRecord;
   };
 
@@ -455,14 +658,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((req) => (req.id === id ? { ...req, status } : req))
     );
 
-    // Call backend API
     fetch(`/api/pickups/${id}/status`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status })
-    }).catch(() => console.log('Status update synced locally'));
+    }).catch(() => {});
 
-    // Call client Supabase
     updatePickupStatusInSupabase(id, status).catch(() => {});
 
     showToast(`Request ${id} status updated to ${status}`, 'info');
@@ -472,8 +673,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPickupRequests((prev) => prev.filter((p) => p.id !== id));
 
     try {
-      fetch(`/api/pickups/${id}`, { method: 'DELETE' }).catch(() => {});
-      await deletePickupFromSupabase(id);
+      await Promise.allSettled([
+        fetch(`/api/pickups/${id}`, { method: 'DELETE' }),
+        deletePickupFromSupabase(id)
+      ]);
       showToast(`Pickup request ${id} deleted`, 'info');
       return true;
     } catch {
@@ -493,25 +696,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Update local state immediately
     setContactMessages((prev) => [contactRecord, ...prev]);
 
-    // 1. Post to backend endpoint (which saves to Supabase server-side)
+    let alreadySyncedToSupabase = false;
     try {
-      await fetch('/api/contacts', {
+      const res = await fetch('/api/contacts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(contactRecord)
       });
+      if (res.ok) {
+        const data = await res.json();
+        alreadySyncedToSupabase = Boolean(data?.supabaseSaved);
+      }
     } catch (apiErr) {
       console.warn('API /api/contacts notice:', apiErr);
     }
 
-    // 2. Direct client-side Supabase persistence
-    try {
-      await saveContactToSupabase(contactRecord);
-    } catch (supaErr) {
-      console.warn('Client Supabase contact sync notice:', supaErr);
+    if (!alreadySyncedToSupabase) {
+      saveContactToSupabase(contactRecord).catch(() => {});
     }
 
-    showToast('Message saved to Supabase database! Our support team will respond shortly. 📩', 'success');
+    showToast('Thank you! Your message has been sent successfully. 📩', 'success');
     return contactRecord;
   };
 
@@ -519,8 +723,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setContactMessages((prev) => prev.filter((c) => c.id !== id));
 
     try {
-      fetch(`/api/contacts/${id}`, { method: 'DELETE' }).catch(() => {});
-      await deleteContactFromSupabase(id);
+      await Promise.allSettled([
+        fetch(`/api/contacts/${id}`, { method: 'DELETE' }),
+        deleteContactFromSupabase(id)
+      ]);
       showToast(`Contact message ${id} removed`, 'info');
       return true;
     } catch {
@@ -596,6 +802,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         login: loginUser,
         register: registerUser,
         logoutUser,
+        environmentalReports,
+        addEnvironmentalReport,
+        deleteEnvironmentalReport,
+        clearEnvironmentalReports,
         pickupRequests,
         addPickupRequest,
         updatePickupStatus,
@@ -603,8 +813,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         contactMessages,
         addContactMessage,
         deleteContactMessage,
-        refreshFromSupabase,
-        isSyncingSupabase,
         segregationHistory,
         addSegregationRecord,
         awardPoints,

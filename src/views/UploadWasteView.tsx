@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { EnvironmentalReportRecord, ReportCategory } from '../types';
 import { 
@@ -70,7 +70,16 @@ const SAMPLE_REPORTS = [
 ];
 
 export const UploadWasteView: React.FC = () => {
-  const { awardPoints, addSegregationRecord, navigate, showToast } = useApp();
+  const {
+    awardPoints,
+    addSegregationRecord,
+    navigate,
+    showToast,
+    environmentalReports: reportHistory,
+    addEnvironmentalReport,
+    deleteEnvironmentalReport,
+    clearEnvironmentalReports
+  } = useApp();
   
   const [selectedCategory, setSelectedCategory] = useState<ReportCategory>('waste');
   const [activeMaterial, setActiveMaterial] = useState<'paper' | 'bottle' | 'electronic' | 'organic' | 'glass' | 'can' | null>(null);
@@ -86,66 +95,12 @@ export const UploadWasteView: React.FC = () => {
   
   const [historyFilter, setHistoryFilter] = useState<'all' | ReportCategory>('all');
 
-  const [reportHistory, setReportHistory] = useState<EnvironmentalReportRecord[]>(() => {
-    const saved = localStorage.getItem('recynova_environmental_reports') || localStorage.getItem('ecocycle_environmental_reports');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return [];
-      }
-    }
-    return [
-      {
-        id: 'rep-01',
-        reportType: 'waste',
-        imageUrl: 'https://images.unsplash.com/photo-1527011046414-4781f1f94f8c?w=600&auto=format&fit=crop&q=80',
-        detectedTitle: 'Crushed PET Water Bottle',
-        categoryOrDomain: 'Recyclable Waste',
-        binColor: 'Blue',
-        binName: 'Blue Bin 🔵',
-        confidenceScore: 98,
-        severityLevel: 'Low',
-        conditionNotes: 'Rinsed clean and flattened properly.',
-        actionSteps: ['Rinsed residue', 'Crushed flat', 'Placed in Blue Bin'],
-        remedialAdvice: 'Converted into recycled polyester fibers for eco-clothing.',
-        pointsAwarded: 40,
-        co2SavedKg: 0.65,
-        timestamp: '2026-08-14'
-      },
-      {
-        id: 'rep-02',
-        reportType: 'air-pollution',
-        imageUrl: 'https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=600&auto=format&fit=crop&q=80',
-        detectedTitle: 'Industrial Chimney Heavy Smoke Plume',
-        categoryOrDomain: 'Air Pollution',
-        confidenceScore: 96,
-        severityLevel: 'Severe',
-        sourceOfPollution: 'Unfiltered furnace chimney combustion',
-        aqiImpact: 'Estimated AQI Spike: 290 (Very Unhealthy)',
-        contaminantsIdentified: ['PM2.5', 'Sulfur Dioxide (SO2)', 'Carbon Monoxide'],
-        conditionNotes: 'Dense soot plume reported near residential zone.',
-        actionSteps: ['Wear N95 protective mask', 'Seal windows', 'CPCB grievance filed'],
-        remedialAdvice: 'Wet scrubber installation mandatory under Clean Air regulations.',
-        pointsAwarded: 60,
-        co2SavedKg: 2.10,
-        ticketId: 'CPCB-AIR-88219',
-        timestamp: '2026-08-15'
-      }
-    ];
-  });
-
   const [uploadedFileName, setUploadedFileName] = useState<string>('');
   const [dragActive, setDragActive] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-
-  useEffect(() => {
-    localStorage.setItem('recynova_environmental_reports', JSON.stringify(reportHistory));
-    localStorage.setItem('ecocycle_environmental_reports', JSON.stringify(reportHistory));
-  }, [reportHistory]);
 
   const startCamera = async () => {
     setCameraError(null);
@@ -452,7 +407,7 @@ export const UploadWasteView: React.FC = () => {
       };
 
       setReportResult(newRecord);
-      setReportHistory((prev) => [newRecord, ...prev]);
+      await addEnvironmentalReport(newRecord, { userNote: combinedHint });
 
       awardPoints(newRecord.pointsAwarded, `Reported ${newRecord.detectedTitle} (${newRecord.categoryOrDomain})`);
       if (newRecord.reportType === 'waste') {
@@ -467,7 +422,7 @@ export const UploadWasteView: React.FC = () => {
       
       const fallbackRecord = getClientSideClassification(selectedImage, selectedCategory, combinedHint);
       setReportResult(fallbackRecord);
-      setReportHistory((prev) => [fallbackRecord, ...prev]);
+      await addEnvironmentalReport(fallbackRecord, { userNote: combinedHint });
       awardPoints(fallbackRecord.pointsAwarded, `Reported ${fallbackRecord.detectedTitle} (${fallbackRecord.categoryOrDomain})`);
       if (fallbackRecord.reportType === 'waste') {
         addSegregationRecord(fallbackRecord.detectedTitle, (fallbackRecord.categoryOrDomain as any) || 'Recyclable Waste', fallbackRecord.pointsAwarded);
@@ -492,29 +447,12 @@ export const UploadWasteView: React.FC = () => {
   };
 
   const handleDeleteReport = (id: string) => {
-    setReportHistory((prev) => {
-      const updated = prev.filter((item) => item.id !== id);
-      try {
-        localStorage.setItem('recynova_environmental_reports', JSON.stringify(updated));
-        localStorage.setItem('ecocycle_environmental_reports', JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Failed to save updated reports to localStorage', e);
-      }
-      return updated;
-    });
-    showToast('Photo report deleted from history', 'info');
+    deleteEnvironmentalReport(id);
   };
 
   const handleClearAllReports = () => {
     if (window.confirm('Delete all photo reports from your history log?')) {
-      setReportHistory([]);
-      try {
-        localStorage.removeItem('recynova_environmental_reports');
-        localStorage.removeItem('ecocycle_environmental_reports');
-      } catch (e) {
-        console.warn('Failed to clear reports from localStorage', e);
-      }
-      showToast('All photo reports deleted', 'info');
+      clearEnvironmentalReports();
     }
   };
 
